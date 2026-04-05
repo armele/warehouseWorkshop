@@ -1,0 +1,13 @@
+{
+  "itemGroup.warehouseworkshop": "Example Mod Tab",
+  "block.warehouseworkshop.example_block": "Example Block",
+  "item.warehouseworkshop.example_item": "Example Item",
+
+  "warehouseworkshop.configuration.title": "Warehouse Workshop - A MineColonies Add-On Configs",
+  "warehouseworkshop.configuration.section.warehouseworkshop.common.toml": "Warehouse Workshop - A MineColonies Add-On Configs",
+  "warehouseworkshop.configuration.section.warehouseworkshop.common.toml.title": "Warehouse Workshop - A MineColonies Add-On Configs",
+  "warehouseworkshop.configuration.items": "Item List",
+  "warehouseworkshop.configuration.logDirtBlock": "Log Dirt Block",
+  "warehouseworkshop.configuration.magicNumberIntroduction": "Magic Number Text",
+  "warehouseworkshop.configuration.magicNumber": "Magic Number"
+}
