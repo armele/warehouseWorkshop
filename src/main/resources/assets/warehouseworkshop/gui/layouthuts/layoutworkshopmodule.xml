@@ -28,6 +28,16 @@
     <button id="gridButton7" size="18 18" pos="38 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
     <button id="gridButton8" size="18 18" pos="56 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
 
+    <gradient id="gridBackground0" size="18 18" pos="20 44" visible="false" enabled="false"/>
+    <gradient id="gridBackground1" size="18 18" pos="38 44" visible="false" enabled="false"/>
+    <gradient id="gridBackground2" size="18 18" pos="56 44" visible="false" enabled="false"/>
+    <gradient id="gridBackground3" size="18 18" pos="20 62" visible="false" enabled="false"/>
+    <gradient id="gridBackground4" size="18 18" pos="38 62" visible="false" enabled="false"/>
+    <gradient id="gridBackground5" size="18 18" pos="56 62" visible="false" enabled="false"/>
+    <gradient id="gridBackground6" size="18 18" pos="20 80" visible="false" enabled="false"/>
+    <gradient id="gridBackground7" size="18 18" pos="38 80" visible="false" enabled="false"/>
+    <gradient id="gridBackground8" size="18 18" pos="56 80" visible="false" enabled="false"/>
+
     <box pos="98 28" size="130 78" linewidth="1"/>
     <text id="recipeLabel" size="118 10" pos="104 31" textalign="MIDDLE" color="black"/>
     <text id="outputLabel" size="50 10" pos="110 45" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.request_item)"/>

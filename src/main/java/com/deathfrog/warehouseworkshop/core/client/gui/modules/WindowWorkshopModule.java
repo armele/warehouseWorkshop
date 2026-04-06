@@ -20,6 +20,7 @@ import com.deathfrog.warehouseworkshop.core.network.WorkshopCraftMessage;
 import com.ldtteam.blockui.Color;
 import com.ldtteam.blockui.PaneBuilders;
 import com.ldtteam.blockui.controls.Button;
+import com.ldtteam.blockui.controls.Gradient;
 import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlock;
@@ -68,10 +69,20 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private static final int DOMUM_SECOND_SLOT = 4;
     private static final int STATUS_TEXT_COLOR = Color.getByName("black", 0x000000);
     private static final int STATUS_MISMATCH_TEXT_COLOR = Color.getByName("red", 0xFF0000);
+    private static final int SLOT_BACKGROUND_ALPHA = 96;
+    private static final int PRESENT_SLOT_RED = 48;
+    private static final int PRESENT_SLOT_GREEN = 160;
+    private static final int PRESENT_SLOT_BLUE = 64;
+    private static final int MISSING_SLOT_RED = 180;
+    private static final int MISSING_SLOT_GREEN = 48;
+    private static final int MISSING_SLOT_BLUE = 48;
 
+    private final List<Gradient> gridBackgrounds = new ArrayList<>(GRID_SIZE);
     private final List<ItemIcon> gridIcons = new ArrayList<>(GRID_SIZE);
     private final List<Button> gridButtons = new ArrayList<>(GRID_SIZE);
     private final List<ItemStack> selectedGrid = new ArrayList<>(Collections.nCopies(GRID_SIZE, ItemStack.EMPTY));
+    private final List<ItemStack> displayGrid = new ArrayList<>(Collections.nCopies(GRID_SIZE, ItemStack.EMPTY));
+    private final List<SlotState> slotStates = new ArrayList<>(Collections.nCopies(GRID_SIZE, SlotState.EMPTY));
     private final List<List<ItemStorage>> slotMatches = new ArrayList<>(GRID_SIZE);
 
     private final ItemIcon requestIcon;
@@ -102,6 +113,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         {
             slotMatches.add(new ArrayList<>());
             final int slot = i;
+            gridBackgrounds.add(window.findPaneOfTypeByID("gridBackground" + i, Gradient.class));
             gridIcons.add(window.findPaneOfTypeByID("gridIcon" + i, ItemIcon.class));
             gridButtons.add(window.findPaneOfTypeByID("gridButton" + i, Button.class));
             registerButton("gridButton" + i, () -> setActiveSlot(slot));
@@ -153,6 +165,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         {
             this.networkId = networkId;
         }
+    }
+
+    private enum SlotState
+    {
+        EMPTY,
+        PRESENT,
+        MISSING
     }
 
     private record WorkshopRecipe(
@@ -294,6 +313,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         final ItemStack selected = stack.copy();
         selected.setCount(1);
         selectedGrid.set(slot, selected);
+        displayGrid.set(slot, selected.copy());
+        slotStates.set(slot, SlotState.PRESENT);
         updateGridIcons();
     }
 
@@ -325,6 +346,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         {
             slotMatches.get(i).clear();
             selectedGrid.set(i, ItemStack.EMPTY);
+            displayGrid.set(i, ItemStack.EMPTY);
+            slotStates.set(i, SlotState.EMPTY);
         }
 
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
@@ -355,18 +378,28 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                 continue;
             }
 
+            displayGrid.set(slot, getIngredientDisplayStack(ingredient));
             final List<ItemStorage> matches = findWarehouseMatches(ingredient);
             slotMatches.get(slot).addAll(matches);
 
             if (tryReserveSlotFromMatches(slot, matches, remainingStock))
             {
+                setSlotPresent(slot);
                 continue;
             }
 
             if (moduleView.shouldIncludePlayerInventory())
             {
-                tryReserveSlotFromMatches(slot, findPlayerInventoryMatches(ingredient), remainingPlayerStock);
+                final List<ItemStorage> playerMatches = findPlayerInventoryMatches(ingredient);
+                slotMatches.get(slot).addAll(playerMatches);
+                if (tryReserveSlotFromMatches(slot, playerMatches, remainingPlayerStock))
+                {
+                    setSlotPresent(slot);
+                    continue;
+                }
             }
+
+            slotStates.set(slot, SlotState.MISSING);
         }
 
         updateRequestDetails();
@@ -386,11 +419,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         for (int component = 0; component < requirements.size(); component++)
         {
             final int slot = domumGridSlot(component);
+            displayGrid.set(slot, getDomumRequirementDisplayStack(requirements.get(component)));
             final List<ItemStorage> matches = findDomumMatches(requirements.get(component).material(), warehouseStock);
             slotMatches.get(slot).addAll(matches);
 
             if (tryReserveSlotFromMatches(slot, matches, remainingStock))
             {
+                setSlotPresent(slot);
                 continue;
             }
 
@@ -398,9 +433,21 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             {
                 final List<ItemStorage> playerMatches = findDomumMatches(requirements.get(component).material(), playerStock);
                 slotMatches.get(slot).addAll(playerMatches);
-                tryReserveSlotFromMatches(slot, playerMatches, remainingPlayerStock);
+                if (tryReserveSlotFromMatches(slot, playerMatches, remainingPlayerStock))
+                {
+                    setSlotPresent(slot);
+                    continue;
+                }
             }
+
+            slotStates.set(slot, SlotState.MISSING);
         }
+    }
+
+    private void setSlotPresent(final int slot)
+    {
+        displayGrid.set(slot, selectedGrid.get(slot));
+        slotStates.set(slot, SlotState.PRESENT);
     }
 
     private boolean tryReserveSlotFromMatches(final int slot, final List<ItemStorage> matches, final Map<ItemStorage, Integer> remainingStock)
@@ -425,6 +472,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
         if (!canAcceptIngredientInSlot(slot))
         {
+            return;
+        }
+
+        if (slotStates.get(slot) == SlotState.MISSING)
+        {
+            selectJeiOutput(displayGrid.get(slot));
             return;
         }
 
@@ -969,6 +1022,31 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matches;
     }
 
+    private ItemStack getIngredientDisplayStack(final Ingredient ingredient)
+    {
+        for (final ItemStack stack : ingredient.getItems())
+        {
+            if (!stack.isEmpty())
+            {
+                final ItemStack displayStack = stack.copy();
+                displayStack.setCount(1);
+                return displayStack;
+            }
+        }
+
+        return ItemStack.EMPTY;
+    }
+
+    private ItemStack getDomumRequirementDisplayStack(final DomumSlotRequirement requirement)
+    {
+        final ItemStack displayStack = new ItemStack(requirement.material());
+        if (!displayStack.isEmpty())
+        {
+            displayStack.setCount(1);
+        }
+        return displayStack;
+    }
+
     private ItemStack buildDomumOutputForRequest(final ArchitectsCutterRecipe recipe, final ItemStack requested, final Level level)
     {
         if (requested.isEmpty() || !matchesDomumRecipeResult(recipe.getResultItem(level.registryAccess()), requested))
@@ -1223,6 +1301,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             {
                 slotMatches.get(i).clear();
                 selectedGrid.set(i, ItemStack.EMPTY);
+                displayGrid.set(i, ItemStack.EMPTY);
+                slotStates.set(i, SlotState.EMPTY);
             }
         }
     }
@@ -1328,10 +1408,32 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         final boolean domumRecipe = selectedRecipe != null && selectedRecipe.kind() == RecipeKind.DOMUM;
         for (int i = 0; i < GRID_SIZE; i++)
         {
-            gridIcons.get(i).setItem(selectedGrid.get(i));
+            gridIcons.get(i).setItem(displayGrid.get(i));
+            updateGridBackground(i);
             gridButtons.get(i).setEnabled(!domumRecipe || i == DOMUM_FIRST_SLOT || i == DOMUM_SECOND_SLOT);
         }
 
         updateRequestDetails();
+    }
+
+    private void updateGridBackground(final int slot)
+    {
+        final Gradient background = gridBackgrounds.get(slot);
+        switch (slotStates.get(slot))
+        {
+            case PRESENT:
+                background.setGradientStart(PRESENT_SLOT_RED, PRESENT_SLOT_GREEN, PRESENT_SLOT_BLUE, SLOT_BACKGROUND_ALPHA);
+                background.setGradientEnd(PRESENT_SLOT_RED, PRESENT_SLOT_GREEN, PRESENT_SLOT_BLUE, SLOT_BACKGROUND_ALPHA);
+                background.show();
+                break;
+            case MISSING:
+                background.setGradientStart(MISSING_SLOT_RED, MISSING_SLOT_GREEN, MISSING_SLOT_BLUE, SLOT_BACKGROUND_ALPHA);
+                background.setGradientEnd(MISSING_SLOT_RED, MISSING_SLOT_GREEN, MISSING_SLOT_BLUE, SLOT_BACKGROUND_ALPHA);
+                background.show();
+                break;
+            default:
+                background.hide();
+                break;
+        }
     }
 }
