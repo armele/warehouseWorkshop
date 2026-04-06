@@ -6,15 +6,26 @@ import com.deathfrog.warehouseworkshop.core.client.gui.modules.WindowWorkshopMod
 import com.ldtteam.blockui.BOScreen;
 
 import mezz.jei.api.IModPlugin;
+import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
+import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.common.NeoForge;
 
 @mezz.jei.api.JeiPlugin
 public class WorkshopJeiPlugin implements IModPlugin
 {
     private final WorkshopGhostIngredientHandler ghostIngredientHandler = new WorkshopGhostIngredientHandler();
+    private IJeiRuntime jeiRuntime;
+    private ItemStack lastClickedIngredient = ItemStack.EMPTY;
+    private long lastClickTimeMs = 0L;
+    private double lastClickX = Double.NaN;
+    private double lastClickY = Double.NaN;
+    private boolean registeredMouseHandler = false;
 
     @Override
     public @NotNull ResourceLocation getPluginUid()
@@ -22,6 +33,15 @@ public class WorkshopJeiPlugin implements IModPlugin
         return ResourceLocation.fromNamespaceAndPath(WarehouseWorkshopMod.MODID, "jei_plugin");
     }
 
+    /**
+     * Registers a JEI GUI handler for the BOScreen class.
+     * <p>
+     * The handler provides a set of properties that are used by JEI to determine the position and size of the GUI.
+     * <p>
+     * The handler is only used when the BOScreen is open, and is used to determine the position of the workshop window within the GUI.
+     * <p>
+     * The handler is also used to register a ghost ingredient handler, which is used to display the currently selected ingredient in the workshop window.
+     */
     @Override
     public void registerGuiHandlers(@NotNull final IGuiHandlerRegistration registration)
     {
@@ -83,5 +103,76 @@ public class WorkshopJeiPlugin implements IModPlugin
             };
         });
         registration.addGhostIngredientHandler(BOScreen.class, ghostIngredientHandler);
+    }
+
+    @Override
+    public void onRuntimeAvailable(@NotNull final IJeiRuntime jeiRuntime)
+    {
+        this.jeiRuntime = jeiRuntime;
+        if (!this.registeredMouseHandler)
+        {
+            NeoForge.EVENT_BUS.addListener(this::onMouseButtonPressed);
+            this.registeredMouseHandler = true;
+        }
+    }
+
+    @Override
+    public void onRuntimeUnavailable()
+    {
+        this.jeiRuntime = null;
+        this.lastClickedIngredient = ItemStack.EMPTY;
+    }
+
+    /**
+     * Called when a mouse button is pressed while the user is inside a JEI screen.
+     * This method handles the logic for selecting a JEI output to send to the workshop
+     * module.
+     *
+     * @param event the event that triggered this method
+     */
+    private void onMouseButtonPressed(final ScreenEvent.MouseButtonPressed.Pre event)
+    {
+        if (event.getButton() != 0 || this.jeiRuntime == null || !(event.getScreen() instanceof BOScreen gui))
+        {
+            return;
+        }
+
+        final WindowWorkshopModule workshopWindow = WorkshopGhostIngredientHandler.getWorkshopWindow(gui);
+        if (workshopWindow == null)
+        {
+            return;
+        }
+
+        final ItemStack hoveredStack = this.jeiRuntime.getIngredientListOverlay()
+            .getIngredientUnderMouse()
+            .flatMap(ITypedIngredient::getItemStack)
+            .map(ItemStack::copy)
+            .orElse(ItemStack.EMPTY);
+        if (hoveredStack.isEmpty())
+        {
+            clearLastClick();
+            return;
+        }
+
+        if (Screen.hasShiftDown())
+        {
+            workshopWindow.selectJeiOutput(hoveredStack);
+            clearLastClick();
+            event.setCanceled(true);
+            return;
+        }
+
+        this.lastClickedIngredient = hoveredStack.copy();
+        this.lastClickTimeMs = System.currentTimeMillis();
+        this.lastClickX = event.getMouseX();
+        this.lastClickY = event.getMouseY();
+    }
+
+    private void clearLastClick()
+    {
+        this.lastClickedIngredient = ItemStack.EMPTY;
+        this.lastClickTimeMs = 0L;
+        this.lastClickX = Double.NaN;
+        this.lastClickY = Double.NaN;
     }
 }

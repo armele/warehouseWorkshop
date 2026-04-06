@@ -40,3 +40,4 @@ repo/
 !**/src/**/repo/
 ./runs/
 /runs
+localdeploy.settings

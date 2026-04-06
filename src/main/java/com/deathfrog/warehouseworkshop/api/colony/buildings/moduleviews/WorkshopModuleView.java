@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import com.deathfrog.warehouseworkshop.core.client.gui.modules.WindowWorkshopModule;
+import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
 import com.ldtteam.blockui.views.BOWindow;
 import com.minecolonies.api.colony.buildings.modules.AbstractBuildingModuleView;
 
@@ -12,11 +13,12 @@ import net.minecraft.network.chat.Component;
 
 public class WorkshopModuleView  extends AbstractBuildingModuleView
 {
+    private OutputTarget outputTarget = OutputTarget.PLAYER_INVENTORY;
 
     @Override
     public void deserialize(@NotNull RegistryFriendlyByteBuf arg0)
     {
-        // The workshop window currently derives its state from the live building view.
+        outputTarget = OutputTarget.byId(arg0.readInt());
     }
 
     @Override
@@ -40,5 +42,15 @@ public class WorkshopModuleView  extends AbstractBuildingModuleView
     public String getIcon()
     {
         return "crafting";
+    }
+
+    public OutputTarget getOutputTarget()
+    {
+        return outputTarget;
+    }
+
+    public void setOutputTarget(final OutputTarget outputTarget)
+    {
+        this.outputTarget = outputTarget;
     }
 }

@@ -21,7 +21,7 @@ public class BuildingsInitializer
         // Get the existing entry to extend
         final DeferredHolder<BuildingEntry,BuildingEntry> warehouse = com.minecolonies.api.colony.buildings.ModBuildings.wareHouse;
 
-        injectModuleToBuilding(BuildingModules.WORKSHOP_MODULE, warehouse);
+        injectModuleToBuilding(BuildingModules.WORKSHOP_MODULE, warehouse, 3);
     }
 
     /**

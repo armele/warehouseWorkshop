@@ -13,7 +13,10 @@ import org.jetbrains.annotations.Nullable;
 
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.api.colony.buildings.moduleviews.WorkshopModuleView;
+import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
+import com.deathfrog.warehouseworkshop.core.network.SetWorkshopOutputTargetMessage;
 import com.deathfrog.warehouseworkshop.core.network.WorkshopCraftMessage;
+import com.ldtteam.blockui.Color;
 import com.ldtteam.blockui.PaneBuilders;
 import com.ldtteam.blockui.controls.Button;
 import com.ldtteam.blockui.controls.ItemIcon;
@@ -60,6 +63,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private final Text recipeLabel;
     private final Text outputLabel;
     private final Text statusLabel;
+    private final Button outputTargetButton;
 
     private final Map<ItemStorage, Integer> warehouseStock = new HashMap<>();
     private final List<ItemStack> requestOutputs = new ArrayList<>();
@@ -87,6 +91,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         this.recipeLabel = window.findPaneOfTypeByID("recipeLabel", Text.class);
         this.outputLabel = window.findPaneOfTypeByID("outputLabel", Text.class);
         this.statusLabel = window.findPaneOfTypeByID("statusLabel", Text.class);
+        this.outputTargetButton = window.findPaneOfTypeByID("outputTarget", Button.class);
 
         registerButton("request", this::showRequests);
         registerButton("clear", this::clearGrid);
@@ -94,6 +99,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         registerButton("craftAll", this::craftAll);
         registerButton("prevRecipe", this::selectPreviousRecipe);
         registerButton("nextRecipe", this::selectNextRecipe);
+        registerButton("outputTarget", this::toggleOutputTarget);
 
         Button requestButton = window.findPaneOfTypeByID("request", Button.class);
         PaneBuilders.tooltipBuilder()
@@ -115,8 +121,26 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
         super.onOpened();
         refreshWarehouseStock();
+        updateOutputTargetButton();
         updateRequestDetails();
         updateGridIcons();
+    }
+
+    private void toggleOutputTarget()
+    {
+        final OutputTarget outputTarget = moduleView.getOutputTarget() == OutputTarget.WAREHOUSE_INVENTORY
+            ? OutputTarget.PLAYER_INVENTORY
+            : OutputTarget.WAREHOUSE_INVENTORY;
+        moduleView.setOutputTarget(outputTarget);
+        new SetWorkshopOutputTargetMessage(buildingView.getPosition(), outputTarget.getId()).sendToServer();
+        updateOutputTargetButton();
+    }
+
+    private void updateOutputTargetButton()
+    {
+        outputTargetButton.setText(Component.translatable(moduleView.getOutputTarget() == OutputTarget.WAREHOUSE_INVENTORY
+            ? "com.warehouseworkshop.core.gui.workshop.output_target.warehouse"
+            : "com.warehouseworkshop.core.gui.workshop.output_target.inventory"));
     }
 
     private void showRequests()
@@ -139,11 +163,6 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         open();
-
-        if (request != null && Compatibility.jeiProxy.isLoaded() && !requestOutputs.isEmpty())
-        {
-            Minecraft.getInstance().submit(() -> Compatibility.jeiProxy.showRecipes(List.copyOf(requestOutputs)));
-        }
     }
 
     private void selectRequest(@NotNull final IRequest<?> request)
@@ -753,13 +772,21 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             outputLabel.setText(jeiSearchOutput.isEmpty()
                 ? Component.translatable("com.warehouseworkshop.core.gui.workshop.request_item")
                 : Component.translatable("com.warehouseworkshop.core.gui.workshop.search_item"));
-            requestLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.request.none"));
+
+            requestLabel.setText(jeiSearchOutput.isEmpty()
+                ? Component.translatable("com.warehouseworkshop.core.gui.workshop.request.none")
+                : Component.translatable("com.warehouseworkshop.core.gui.workshop.jei_search_item"));
+
             requestIcon.setItem(jeiSearchOutput);
         }
         else
         {
             outputLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.request_item"));
-            requestLabel.setText(selectedRequest.getShortDisplayString().copy());
+
+            requestLabel.setText(jeiSearchOutput.isEmpty()
+                ? selectedRequest.getShortDisplayString().copy()
+                : Component.translatable("com.warehouseworkshop.core.gui.workshop.jei_search_item"));
+
             requestIcon.setItem(getRequestPreviewOutput());
         }
 
@@ -790,7 +817,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         statusLabel.setText(doesCurrentGridMatchRequest()
             ? Component.translatable("com.warehouseworkshop.core.gui.workshop.status.ready")
-            : Component.translatable("com.warehouseworkshop.core.gui.workshop.status.validmismatch"));
+            : Component.translatable("com.warehouseworkshop.core.gui.workshop.status.validmismatch").withColor(Color.getByName("red")));
     }
 
     private void updateGridIcons()
@@ -803,6 +830,3 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         updateRequestDetails();
     }
 }
-
-
-

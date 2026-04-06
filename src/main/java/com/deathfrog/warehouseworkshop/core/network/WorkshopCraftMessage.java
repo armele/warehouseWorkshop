@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
 
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule;
+import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
 import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.util.InventoryUtils;
@@ -24,6 +25,8 @@ import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -61,7 +64,8 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         }
 
         final IBuilding building = IColonyManager.getInstance().getBuilding(player.level(), buildingPos);
-        if (building == null || building.getModule(WorkshopModule.class, module -> true) == null)
+        final WorkshopModule module = building == null ? null : building.getModule(WorkshopModule.class, candidate -> true);
+        if (building == null || module == null)
         {
             return;
         }
@@ -97,6 +101,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
 
         final ItemStack craftedResult = recipe.get().value().assemble(input, player.level().registryAccess()).copy();
         final List<ItemStack> remainingItems = recipe.get().value().getRemainingItems(input);
+        final OutputTarget outputTarget = module.getOutputTarget();
         int crafted = 0;
 
         for (int i = 0; i < craftCount; i++)
@@ -112,10 +117,10 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
                 break;
             }
 
-            giveToPlayer(player, craftedResult.copy());
+            giveCraftingOutput(player, building.getItemHandlerCap(), craftedResult.copy(), outputTarget);
             for (final ItemStack remainder : remainingItems)
             {
-                giveToPlayer(player, remainder.copy());
+                giveCraftingOutput(player, building.getItemHandlerCap(), remainder.copy(), outputTarget);
             }
             crafted++;
         }
@@ -153,6 +158,31 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         if (!added && !stack.isEmpty())
         {
             player.drop(stack, false);
+        }
+    }
+
+    private static void giveCraftingOutput(final Player player, final IItemHandler warehouseInventory, final ItemStack stack, final OutputTarget outputTarget)
+    {
+        if (outputTarget.isWarehouse())
+        {
+            giveToWarehouse(player, warehouseInventory, stack);
+            return;
+        }
+
+        giveToPlayer(player, stack);
+    }
+
+    private static void giveToWarehouse(final Player player, final IItemHandler warehouseInventory, final ItemStack stack)
+    {
+        if (stack.isEmpty())
+        {
+            return;
+        }
+
+        final ItemStack remainder = ItemHandlerHelper.insertItemStacked(warehouseInventory, stack, false);
+        if (!remainder.isEmpty())
+        {
+            giveToPlayer(player, remainder);
         }
     }
 }

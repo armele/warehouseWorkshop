@@ -46,7 +46,12 @@
     <box pos="12 112" size="216 36" linewidth="1"/>
     <text id="requestLabel" size="204 10" pos="18 118" color="black"/>
     <text id="statusLabel" size="204 18" pos="18 130" color="black"/>
-
+    <box pos="12 154" size="216 30" linewidth="1"/>
+    <text id="outputTargetLabel" size="72 10" pos="18 164" color="black"
+          label="$(com.warehouseworkshop.core.gui.workshop.output_target.label)"/>
+    <button id="outputTarget" size="88 16" pos="128 160" color="black"
+            source="minecolonies:textures/gui/builderhut/builder_button_small.png"
+            label="$(com.warehouseworkshop.core.gui.workshop.output_target.inventory)"/>
     <button id="clear" size="52 16" pos="37 265" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.clear)"/>
