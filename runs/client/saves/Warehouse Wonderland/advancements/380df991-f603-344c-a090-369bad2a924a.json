@@ -1,0 +1,298 @@
+{
+  "minecraft:recipes/decorations/crafting_table": {
+    "criteria": {
+      "unlock_right_away": "2026-04-05 19:31:12 -0400"
+    },
+    "done": true
+  },
+  "minecraft:adventure/adventuring_time": {
+    "criteria": {
+      "minecraft:stony_shore": "2026-04-05 19:31:26 -0400",
+      "minecraft:savanna": "2026-04-05 19:31:13 -0400"
+    },
+    "done": false
+  },
+  "minecolonies:recipes/misc/blockwaypoint": {
+    "criteria": {
+      "has_build_tool": "2026-04-05 19:31:40 -0400"
+    },
+    "done": true
+  },
+  "minecolonies:recipes/misc/clipboard": {
+    "criteria": {
+      "has_build_tool": "2026-04-05 19:31:40 -0400"
+    },
+    "done": true
+  },
+  "minecolonies:recipes/misc/colonysign": {
+    "criteria": {
+      "has_items": "2026-04-05 19:31:40 -0400"
+    },
+    "done": true
+  },
+  "minecolonies:recipes/misc/blockhuttownhall": {
+    "criteria": {
+      "has_items": "2026-04-05 19:31:40 -0400"
+    },
+    "done": true
+  },
+  "minecolonies:recipes/misc/questlog": {
+    "criteria": {
+      "has_build_tool": "2026-04-05 19:31:40 -0400"
+    },
+    "done": true
+  },
+  "minecolonies:recipes/misc/resourcescroll": {
+    "criteria": {
+      "has_build_tool": "2026-04-05 19:31:40 -0400"
+    },
+    "done": true
+  },
+  "minecolonies:recipes/misc/blockminecoloniesrack": {
+    "criteria": {
+      "has_build_tool": "2026-04-05 19:31:40 -0400"
+    },
+    "done": true
+  },
+  "minecolonies:recipes/misc/build_goggles": {
+    "criteria": {
+      "has_build_tool": "2026-04-05 19:31:40 -0400"
+    },
+    "done": true
+  },
+  "minecolonies:recipes/misc/colonymap": {
+    "criteria": {
+      "has_build_tool": "2026-04-05 19:31:40 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/redstone/lever": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "domum_ornamentum:recipes/tools/blue_cobblestone_extra": {
+    "criteria": {
+      "has_material": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/combat/stone_sword": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/cobblestone_wall": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/tools/stone_axe": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:story/mine_stone": {
+    "criteria": {
+      "get_stone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/furnace": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/building_blocks/cobblestone_slab_from_cobblestone_stonecutting": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/building_blocks/stone": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/tools/stone_pickaxe": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "domum_ornamentum:recipes/tools/green_cobblestone_extra": {
+    "criteria": {
+      "has_material": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "domum_ornamentum:recipes/tools/cobblestone_extra": {
+    "criteria": {
+      "has_material": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/building_blocks/cobblestone_slab": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/cobblestone_wall_from_cobblestone_stonecutting": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/building_blocks/cobblestone_stairs_from_cobblestone_stonecutting": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/building_blocks/cobblestone_stairs": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/tools/stone_hoe": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/tools/stone_shovel": {
+    "criteria": {
+      "has_cobblestone": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "domum_ornamentum:recipes/tools/purple_cobblestone_extra": {
+    "criteria": {
+      "has_material": "2026-04-05 19:36:27 -0400"
+    },
+    "done": true
+  },
+  "minecolonies:production/post_and_stash": {
+    "criteria": {
+      "postbox": "2026-04-05 19:39:28 -0400"
+    },
+    "done": false
+  },
+  "domum_ornamentum:recipes/tools/architectscutter": {
+    "criteria": {
+      "has_log": "2026-04-05 19:59:56 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/misc/charcoal": {
+    "criteria": {
+      "has_log": "2026-04-05 19:59:56 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/building_blocks/oak_planks": {
+    "criteria": {
+      "has_logs": "2026-04-05 19:59:56 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/building_blocks/oak_wood": {
+    "criteria": {
+      "has_log": "2026-04-05 19:59:56 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/oak_sign": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/redstone/oak_trapdoor": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "domum_ornamentum:recipes/building_blocks/blockbarreldeco_onside": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/misc/stick": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/building_blocks/oak_stairs": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/oak_fence": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/redstone/oak_button": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/building_blocks/oak_slab": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/redstone/oak_fence_gate": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/redstone/oak_pressure_plate": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/redstone/oak_door": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "domum_ornamentum:recipes/building_blocks/blockbarreldeco_standing": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/barrel": {
+    "criteria": {
+      "has_planks": "2026-04-05 20:03:57 -0400"
+    },
+    "done": true
+  },
+  "minecraft:recipes/decorations/composter": {
+    "criteria": {
+      "has_wood_slab": "2026-04-05 20:30:41 -0400"
+    },
+    "done": true
+  },
+  "DataVersion": 3955
+}

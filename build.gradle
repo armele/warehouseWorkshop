@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'idea'
     id 'maven-publish'
     id 'net.neoforged.gradle.userdev' version '7.1.21'
 }
@@ -26,7 +27,20 @@ sourceSets.main.resources {
 }
 
 repositories {
-    // Add here additional repositories if required by some of the dependencies below.
+    mavenLocal()
+    flatDir {
+        dirs '../Minecolonies/build/libs' // adjust path as needed
+    }
+    maven {
+        name 'LDTTeam - Modding'
+        url 'https://ldtteam.jfrog.io/ldtteam/modding/'
+    } 
+    maven {
+        // location of the maven that hosts JEI files since January 2023
+        name = "Jared's maven"
+        url = "https://maven.blamejared.com/"
+
+    }
 }
 
 base {
@@ -102,27 +116,27 @@ dependencies {
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
 
-    // Example optional mod dependency with JEI
-    // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
-    // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
-    // compileOnly "mezz.jei:jei-${mc_version}-neoforge-api:${jei_version}"
-    // We add the full version to localRuntime, not runtimeOnly, so that we do not publish a dependency on it
-    // localRuntime "mezz.jei:jei-${mc_version}-neoforge:${jei_version}"
+    compileOnly name: 'minecolonies-1.1.1290-1.21.1-snapshot'
+    localRuntime files ('../Minecolonies/build/libs/minecolonies-1.1.1290-1.21.1-snapshot.jar')
+    
+    compileOnly name: 'multipiston-1.2.58-1.21.1'
+    localRuntime files ('../Minecolonies/build/libs/multipiston-1.2.58-1.21.1.jar')
 
-    // Example mod dependency using a mod jar from ./libs with a flat dir repository
-    // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
-    // The group id is ignored when searching -- in this case, it is "blank"
-    // implementation "blank:coolmod-${mc_version}:${coolmod_version}"
+    compileOnly name: 'blockui-1.0.211-1.21.1-snapshot'  // use the actual filename without .jar
+    localRuntime files('../Minecolonies/build/libs/blockui-1.0.211-1.21.1-snapshot.jar')    
 
-    // Example mod dependency using a file as dependency
-    // implementation files("libs/coolmod-${mc_version}-${coolmod_version}.jar")
+    compileOnly name: 'structurize-1.0.816-1.21.1'  // use the actual filename without .jar
+    localRuntime files('../Minecolonies/build/libs/structurize-1.0.816-1.21.1.jar')    
 
-    // Example project dependency using a sister or child project:
-    // implementation project(":myproject")
+    compileOnly name: 'domum-ornamentum-1.0.233-snapshot-main'  // use the actual filename without .jar
+    localRuntime files('../Minecolonies/build/libs/domum-ornamentum-1.0.233-snapshot-main.jar')    
 
-    // For more info:
-    // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
-    // http://www.gradle.org/docs/current/userguide/dependency_management.html
+    // JEI for compile-time access
+    compileOnly("mezz.jei:jei-1.21.1-neoforge-api:19.27.0.336")
+    compileOnly("mezz.jei:jei-1.21.1-neoforge:19.27.0.336")
+
+    // Runtime for dev only (so it loads in runClient/runServer)
+    localRuntime("mezz.jei:jei-1.21.1-neoforge:19.27.0.336")
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.
