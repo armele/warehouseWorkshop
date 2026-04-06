@@ -52,6 +52,8 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleView>
 {
     private static final int GRID_SIZE = 9;
+    private static final int STATUS_TEXT_COLOR = Color.getByName("black", 0x000000);
+    private static final int STATUS_MISMATCH_TEXT_COLOR = Color.getByName("red", 0xFF0000);
 
     private final List<ItemIcon> gridIcons = new ArrayList<>(GRID_SIZE);
     private final List<ItemStack> selectedGrid = new ArrayList<>(Collections.nCopies(GRID_SIZE, ItemStack.EMPTY));
@@ -289,11 +291,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void clearGrid()
     {
-        for (int i = 0; i < GRID_SIZE; i++)
-        {
-            selectedGrid.set(i, ItemStack.EMPTY);
-        }
-
+        clearRequestSelection();
+        clearJeiSelection(true);
         updateGridIcons();
     }
 
@@ -307,7 +306,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         final int craftCount = getCraftAllCount();
         if (craftCount <= 0)
         {
-            statusLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"));
+            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"));
             return;
         }
 
@@ -318,18 +317,18 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
         if (getActiveRecipe() == null)
         {
-            statusLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.norecipe"));
+            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.norecipe"));
             return;
         }
 
         if (!isGridCraftable())
         {
-            statusLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"));
+            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"));
             return;
         }
 
         new WorkshopCraftMessage(buildingView.getPosition(), List.copyOf(selectedGrid), craftCount).sendToServer();
-        statusLabel.setText(Component.translatable(
+        setStatusText(Component.translatable(
             craftCount == 1
                 ? "com.warehouseworkshop.core.gui.workshop.status.sent"
                 : "com.warehouseworkshop.core.gui.workshop.status.sent.all",
@@ -798,7 +797,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         {
             recipeLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.recipe.none"));
             outputIcon.setItem(ItemStack.EMPTY);
-            statusLabel.setText(selectedGrid.stream().allMatch(ItemStack::isEmpty)
+            setStatusText(selectedGrid.stream().allMatch(ItemStack::isEmpty)
                 ? Component.translatable("com.warehouseworkshop.core.gui.workshop.status.selectrequest")
                 : Component.translatable("com.warehouseworkshop.core.gui.workshop.status.invalid"));
             return;
@@ -811,13 +810,30 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         outputIcon.setItem(currentGridOutput);
         if (!isGridCraftable())
         {
-            statusLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"));
+            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"));
             return;
         }
 
-        statusLabel.setText(doesCurrentGridMatchRequest()
-            ? Component.translatable("com.warehouseworkshop.core.gui.workshop.status.ready")
-            : Component.translatable("com.warehouseworkshop.core.gui.workshop.status.validmismatch").withColor(Color.getByName("red")));
+        if (doesCurrentGridMatchRequest())
+        {
+            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.ready"));
+            return;
+        }
+
+        setStatusText(
+            Component.translatable("com.warehouseworkshop.core.gui.workshop.status.validmismatch"),
+            STATUS_MISMATCH_TEXT_COLOR);
+    }
+
+    private void setStatusText(final Component status)
+    {
+        setStatusText(status, STATUS_TEXT_COLOR);
+    }
+
+    private void setStatusText(final Component status, final int color)
+    {
+        statusLabel.setTextColor(color);
+        statusLabel.setText(status);
     }
 
     private void updateGridIcons()

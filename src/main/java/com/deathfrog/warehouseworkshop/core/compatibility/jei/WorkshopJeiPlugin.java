@@ -21,10 +21,6 @@ public class WorkshopJeiPlugin implements IModPlugin
 {
     private final WorkshopGhostIngredientHandler ghostIngredientHandler = new WorkshopGhostIngredientHandler();
     private IJeiRuntime jeiRuntime;
-    private ItemStack lastClickedIngredient = ItemStack.EMPTY;
-    private long lastClickTimeMs = 0L;
-    private double lastClickX = Double.NaN;
-    private double lastClickY = Double.NaN;
     private boolean registeredMouseHandler = false;
 
     @Override
@@ -120,7 +116,6 @@ public class WorkshopJeiPlugin implements IModPlugin
     public void onRuntimeUnavailable()
     {
         this.jeiRuntime = null;
-        this.lastClickedIngredient = ItemStack.EMPTY;
     }
 
     /**
@@ -150,29 +145,14 @@ public class WorkshopJeiPlugin implements IModPlugin
             .orElse(ItemStack.EMPTY);
         if (hoveredStack.isEmpty())
         {
-            clearLastClick();
             return;
         }
 
         if (Screen.hasShiftDown())
         {
             workshopWindow.selectJeiOutput(hoveredStack);
-            clearLastClick();
             event.setCanceled(true);
             return;
         }
-
-        this.lastClickedIngredient = hoveredStack.copy();
-        this.lastClickTimeMs = System.currentTimeMillis();
-        this.lastClickX = event.getMouseX();
-        this.lastClickY = event.getMouseY();
-    }
-
-    private void clearLastClick()
-    {
-        this.lastClickedIngredient = ItemStack.EMPTY;
-        this.lastClickTimeMs = 0L;
-        this.lastClickX = Double.NaN;
-        this.lastClickY = Double.NaN;
     }
 }
