@@ -80,6 +80,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private final Text recipeLabel;
     private final Text outputLabel;
     private final Text statusLabel;
+    private final Button craftButton;
+    private final Button craftAllButton;
     private final Button outputTargetButton;
     private final Button includePlayerInventoryButton;
 
@@ -111,6 +113,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         this.recipeLabel = window.findPaneOfTypeByID("recipeLabel", Text.class);
         this.outputLabel = window.findPaneOfTypeByID("outputLabel", Text.class);
         this.statusLabel = window.findPaneOfTypeByID("statusLabel", Text.class);
+        this.craftButton = window.findPaneOfTypeByID("craft", Button.class);
+        this.craftAllButton = window.findPaneOfTypeByID("craftAll", Button.class);
         this.outputTargetButton = window.findPaneOfTypeByID("outputTarget", Button.class);
         this.includePlayerInventoryButton = window.findPaneOfTypeByID("includePlayerInventory", Button.class);
 
@@ -489,9 +493,33 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                 ? "com.warehouseworkshop.core.gui.workshop.status.sent"
                 : "com.warehouseworkshop.core.gui.workshop.status.sent.all",
             craftCount));
-        refreshWarehouseStock();
-        refreshPlayerInventoryStock();
+    }
+
+    public void refreshCraftingContents(
+        final BlockPos buildingPos,
+        final List<ItemStack> warehouseStockSnapshot,
+        final List<ItemStack> playerStockSnapshot)
+    {
+        if (!Objects.equals(buildingView.getPosition(), buildingPos))
+        {
+            return;
+        }
+
+        applyStockSnapshot(warehouseStock, warehouseStockSnapshot);
+        applyStockSnapshot(playerStock, playerStockSnapshot);
         applySelectedRecipe();
+    }
+
+    private void applyStockSnapshot(final Map<ItemStorage, Integer> stock, final List<ItemStack> snapshot)
+    {
+        stock.clear();
+        for (final ItemStack stack : snapshot)
+        {
+            if (!stack.isEmpty())
+            {
+                stock.merge(new ItemStorage(stack.copy()), stack.getCount(), Integer::sum);
+            }
+        }
     }
 
     private int getCraftAllCount()
@@ -605,9 +633,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return assembleDomumOutput(selectedRecipe);
         }
 
-        final RecipeHolder<CraftingRecipe> currentRecipe = selectedRecipe != null && selectedRecipe.craftingRecipe() != null
-            ? selectedRecipe.craftingRecipe()
-            : getCurrentGridRecipe();
+        final RecipeHolder<CraftingRecipe> currentRecipe = getCurrentGridRecipe();
         final Level level = Minecraft.getInstance().level;
         if (currentRecipe == null || level == null)
         {
@@ -619,18 +645,24 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private boolean doesCurrentGridMatchRequest()
     {
-        if (selectedRequest == null)
+        final ItemStack gridOutput = getCurrentGridOutput();
+        if (gridOutput.isEmpty())
         {
-            return true;
+            return false;
         }
 
-        final ItemStack gridOutput = getCurrentGridOutput();
-        return !gridOutput.isEmpty() && getRequestedOutputCount(gridOutput) > 0;
+        if (selectedRequest != null)
+        {
+            return getRequestedOutputCount(gridOutput) > 0;
+        }
+
+        return jeiSearchOutput.isEmpty()
+            || ItemStackUtils.compareItemStacksIgnoreStackSize(gridOutput, jeiSearchOutput, false, true);
     }
 
     private ItemStack getRequestPreviewOutput()
     {
-        final WorkshopRecipe selectedRecipe = getActiveRecipe();
+        final WorkshopRecipe selectedRecipe = getSelectedRecipe();
         if (selectedRecipe != null)
         {
             final ItemStack recipeOutput = selectedRecipe.output().copy();
@@ -1164,13 +1196,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
         final Level level = Minecraft.getInstance().level;
-        if (selectedRecipe != null || level == null)
+        if ((selectedRecipe != null && selectedRecipe.kind() == RecipeKind.DOMUM) || level == null)
         {
             return selectedRecipe;
         }
 
         final RecipeHolder<CraftingRecipe> currentRecipe = getCurrentGridRecipe();
-        return currentRecipe == null ? null : WorkshopRecipe.crafting(currentRecipe, level);
+        return currentRecipe == null ? selectedRecipe : WorkshopRecipe.crafting(currentRecipe, level);
     }
 
     private void clearRequestSelection()
@@ -1197,6 +1229,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void updateRequestDetails()
     {
+        updateCraftButtons();
+
         if (selectedRequest == null)
         {
             outputLabel.setText(jeiSearchOutput.isEmpty()
@@ -1254,6 +1288,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         setStatusText(
             Component.translatable("com.warehouseworkshop.core.gui.workshop.status.validmismatch"),
             STATUS_MISMATCH_TEXT_COLOR);
+    }
+
+    private void updateCraftButtons()
+    {
+        final boolean craftable = isGridCraftable();
+        craftButton.setEnabled(craftable);
+        craftAllButton.setEnabled(craftable);
     }
 
     private Component getReadyStatusText()

@@ -26,6 +26,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -136,6 +137,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         if (!hasCraftingIngredients(copyIngredients(baseIngredients), warehouseInventory, playerInventory, includePlayerInventory))
         {
             player.displayClientMessage(getMissingStatusText(includePlayerInventory), true);
+            sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
             return;
         }
 
@@ -168,10 +170,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         if (crafted <= 0)
         {
             player.displayClientMessage(getMissingStatusText(includePlayerInventory), true);
+            sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
             return;
         }
 
         player.displayClientMessage(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.crafted", crafted), true);
+        sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
     }
 
     private void executeDomumCraft(
@@ -220,6 +224,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         if (!hasCraftingIngredients(copyIngredients(baseIngredients), warehouseInventory, playerInventory, includePlayerInventory))
         {
             player.displayClientMessage(getMissingStatusText(includePlayerInventory), true);
+            sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
             return;
         }
 
@@ -245,10 +250,23 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         if (crafted <= 0)
         {
             player.displayClientMessage(getMissingStatusText(includePlayerInventory), true);
+            sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
             return;
         }
 
         player.displayClientMessage(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.crafted", crafted), true);
+        sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
+    }
+
+    private void sendCraftingContentsSnapshot(
+        final Player player,
+        final IItemHandler warehouseInventory,
+        final IItemHandler playerInventory)
+    {
+        if (player instanceof final ServerPlayer serverPlayer)
+        {
+            ClientboundWorkshopCraftedMessage.sendToPlayer(serverPlayer, buildingPos, warehouseInventory, playerInventory);
+        }
     }
 
     private static List<IMateriallyTexturedBlockComponent> getDomumComponents(final ArchitectsCutterRecipe recipe)

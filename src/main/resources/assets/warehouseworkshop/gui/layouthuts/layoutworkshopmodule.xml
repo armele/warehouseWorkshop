@@ -6,27 +6,27 @@
            label="$(com.warehouseworkshop.core.gui.workshop.title)"/>
 
     <box pos="12 28" size="78 78" linewidth="1"/>
-    <text size="58 10" pos="18 31" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.recipe)"/>
+    <text size="58 10" pos="20 31" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.recipe)"/>
 
-    <itemicon id="gridIcon0" size="18 18" pos="18 44"/>
-    <itemicon id="gridIcon1" size="18 18" pos="36 44"/>
-    <itemicon id="gridIcon2" size="18 18" pos="54 44"/>
-    <itemicon id="gridIcon3" size="18 18" pos="18 62"/>
-    <itemicon id="gridIcon4" size="18 18" pos="36 62"/>
-    <itemicon id="gridIcon5" size="18 18" pos="54 62"/>
-    <itemicon id="gridIcon6" size="18 18" pos="18 80"/>
-    <itemicon id="gridIcon7" size="18 18" pos="36 80"/>
-    <itemicon id="gridIcon8" size="18 18" pos="54 80"/>
+    <itemicon id="gridIcon0" size="18 18" pos="20 44"/>
+    <itemicon id="gridIcon1" size="18 18" pos="38 44"/>
+    <itemicon id="gridIcon2" size="18 18" pos="56 44"/>
+    <itemicon id="gridIcon3" size="18 18" pos="20 62"/>
+    <itemicon id="gridIcon4" size="18 18" pos="38 62"/>
+    <itemicon id="gridIcon5" size="18 18" pos="56 62"/>
+    <itemicon id="gridIcon6" size="18 18" pos="20 80"/>
+    <itemicon id="gridIcon7" size="18 18" pos="38 80"/>
+    <itemicon id="gridIcon8" size="18 18" pos="56 80"/>
 
-    <button id="gridButton0" size="18 18" pos="18 44" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton1" size="18 18" pos="36 44" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton2" size="18 18" pos="54 44" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton3" size="18 18" pos="18 62" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton4" size="18 18" pos="36 62" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton5" size="18 18" pos="54 62" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton6" size="18 18" pos="18 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton7" size="18 18" pos="36 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton8" size="18 18" pos="54 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton0" size="18 18" pos="20 44" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton1" size="18 18" pos="38 44" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton2" size="18 18" pos="56 44" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton3" size="18 18" pos="20 62" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton4" size="18 18" pos="38 62" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton5" size="18 18" pos="56 62" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton6" size="18 18" pos="20 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton7" size="18 18" pos="38 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton8" size="18 18" pos="56 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
 
     <box pos="98 28" size="130 78" linewidth="1"/>
     <text id="recipeLabel" size="118 10" pos="104 31" textalign="MIDDLE" color="black"/>
@@ -43,7 +43,7 @@
             source="minecolonies:textures/gui/builderhut/builder_button_mini.png"
             label="&gt;"/>
 
-    <box pos="12 112" size="216 36" linewidth="1"/>
+    <box pos="12 112" size="216 38" linewidth="1"/>
     <text id="requestLabel" size="204 10" pos="18 118" color="black"/>
     <text id="statusLabel" size="204 18" pos="18 130" color="black"/>
     <box pos="12 154" size="216 40" linewidth="1"/>

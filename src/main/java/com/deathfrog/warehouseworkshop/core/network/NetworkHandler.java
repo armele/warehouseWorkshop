@@ -19,6 +19,7 @@ public final class NetworkHandler
     {
         final String modVersion = ModList.get().getModContainerById(WarehouseWorkshopMod.MODID).get().getModInfo().getVersion().toString();
         final PayloadRegistrar registrar = event.registrar(WarehouseWorkshopMod.MODID).versioned(modVersion);
+        registrar.playToClient(ClientboundWorkshopCraftedMessage.ID, ClientboundWorkshopCraftedMessage.STREAM_CODEC, ClientboundWorkshopCraftedMessage::onExecute);
         registrar.playToServer(WorkshopCraftMessage.ID, WorkshopCraftMessage.STREAM_CODEC, WorkshopCraftMessage::onExecute);
         registrar.playToServer(SetWorkshopOutputTargetMessage.ID, SetWorkshopOutputTargetMessage.STREAM_CODEC, SetWorkshopOutputTargetMessage::onExecute);
         registrar.playToServer(SetWorkshopIncludePlayerInventoryMessage.ID, SetWorkshopIncludePlayerInventoryMessage.STREAM_CODEC, SetWorkshopIncludePlayerInventoryMessage::onExecute);
