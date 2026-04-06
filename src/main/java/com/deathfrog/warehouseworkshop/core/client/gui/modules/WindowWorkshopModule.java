@@ -14,14 +14,14 @@ import org.jetbrains.annotations.Nullable;
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.api.colony.buildings.moduleviews.WorkshopModuleView;
 import com.deathfrog.warehouseworkshop.core.network.WorkshopCraftMessage;
-import com.ldtteam.blockui.Pane;
+import com.ldtteam.blockui.PaneBuilders;
 import com.ldtteam.blockui.controls.Button;
 import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
-import com.ldtteam.blockui.views.ScrollingList;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IConcreteDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
+import com.minecolonies.api.compatibility.Compatibility;
 import com.minecolonies.api.crafting.ItemStorage;
 import com.minecolonies.api.util.ItemStackUtils;
 import com.minecolonies.core.client.gui.AbstractModuleWindow;
@@ -49,18 +49,16 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleView>
 {
     private static final int GRID_SIZE = 9;
-    private static final int MATCH_COLUMNS = 9;
 
     private final List<ItemIcon> gridIcons = new ArrayList<>(GRID_SIZE);
     private final List<ItemStack> selectedGrid = new ArrayList<>(Collections.nCopies(GRID_SIZE, ItemStack.EMPTY));
     private final List<List<ItemStorage>> slotMatches = new ArrayList<>(GRID_SIZE);
 
-    private final ScrollingList matchesList;
     private final ItemIcon requestIcon;
     private final ItemIcon outputIcon;
     private final Text requestLabel;
     private final Text recipeLabel;
-    private final Text slotLabel;
+    private final Text outputLabel;
     private final Text statusLabel;
 
     private final Map<ItemStorage, Integer> warehouseStock = new HashMap<>();
@@ -68,8 +66,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private final List<RecipeHolder<CraftingRecipe>> matchingRecipes = new ArrayList<>();
 
     private @Nullable IRequest<?> selectedRequest;
+    private ItemStack jeiSearchOutput = ItemStack.EMPTY;
     private int selectedRecipeIndex = -1;
-    private int activeSlot;
 
     public WindowWorkshopModule(final WorkshopModuleView moduleView)
     {
@@ -83,12 +81,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             registerButton("gridButton" + i, () -> setActiveSlot(slot));
         }
 
-        this.matchesList = window.findPaneOfTypeByID("matches", ScrollingList.class);
         this.requestIcon = window.findPaneOfTypeByID("requestPreview", ItemIcon.class);
         this.outputIcon = window.findPaneOfTypeByID("outputPreview", ItemIcon.class);
         this.requestLabel = window.findPaneOfTypeByID("requestLabel", Text.class);
         this.recipeLabel = window.findPaneOfTypeByID("recipeLabel", Text.class);
-        this.slotLabel = window.findPaneOfTypeByID("slotLabel", Text.class);
+        this.outputLabel = window.findPaneOfTypeByID("outputLabel", Text.class);
         this.statusLabel = window.findPaneOfTypeByID("statusLabel", Text.class);
 
         registerButton("request", this::showRequests);
@@ -97,6 +94,20 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         registerButton("craftAll", this::craftAll);
         registerButton("prevRecipe", this::selectPreviousRecipe);
         registerButton("nextRecipe", this::selectNextRecipe);
+
+        Button requestButton = window.findPaneOfTypeByID("request", Button.class);
+        PaneBuilders.tooltipBuilder()
+                .append(Component.translatable("com.warehouseworkshop.core.gui.workshop.request.tooltip"))
+                .hoverPane(requestButton)
+                .build();
+
+        if (Compatibility.jeiProxy.isLoaded())
+        {
+            PaneBuilders.tooltipBuilder()
+                    .append(Component.translatable("com.warehouseworkshop.core.gui.workshop.output.tooltip"))
+                    .hoverPane(requestIcon)
+                    .build();
+        }
     }
 
     @Override
@@ -105,7 +116,6 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         super.onOpened();
         refreshWarehouseStock();
         updateRequestDetails();
-        updateMatchesList();
         updateGridIcons();
     }
 
@@ -125,16 +135,61 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
         if (request != null)
         {
-            this.selectedRequest = request;
-            this.requestOutputs.clear();
-            this.requestOutputs.addAll(extractRequestedOutputs(request));
-            this.matchingRecipes.clear();
-            this.matchingRecipes.addAll(findMatchingRecipes(this.requestOutputs, false));
-            this.selectedRecipeIndex = this.matchingRecipes.isEmpty() ? -1 : 0;
-            applySelectedRecipe();
+            selectRequest(request);
         }
 
         open();
+
+        if (request != null && Compatibility.jeiProxy.isLoaded() && !requestOutputs.isEmpty())
+        {
+            Minecraft.getInstance().submit(() -> Compatibility.jeiProxy.showRecipes(List.copyOf(requestOutputs)));
+        }
+    }
+
+    private void selectRequest(@NotNull final IRequest<?> request)
+    {
+        clearJeiSelection(true);
+        outputLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.request_item"));
+        this.selectedRequest = request;
+        this.requestOutputs.clear();
+        this.requestOutputs.addAll(extractRequestedOutputs(request));
+        this.matchingRecipes.addAll(findMatchingRecipes(this.requestOutputs, false));
+        this.selectedRecipeIndex = this.matchingRecipes.isEmpty() ? -1 : 0;
+        applySelectedRecipe();
+    }
+
+    public void selectJeiOutput(@NotNull final ItemStack output)
+    {
+        if (output.isEmpty())
+        {
+            return;
+        }
+
+        clearRequestSelection();
+        this.jeiSearchOutput = output.copy();
+        this.jeiSearchOutput.setCount(1);
+        outputLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.search_item"));
+        this.matchingRecipes.clear();
+        this.matchingRecipes.addAll(findMatchingRecipes(List.of(output), false));
+        this.selectedRecipeIndex = this.matchingRecipes.isEmpty() ? -1 : 0;
+        applySelectedRecipe();
+    }
+
+    public void applyJeiIngredientToSlot(final int slot, @NotNull final ItemStack stack)
+    {
+        if (slot < 0 || slot >= GRID_SIZE || stack.isEmpty())
+        {
+            return;
+        }
+
+        clearRequestSelection();
+        clearJeiSelection(false);
+        outputLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.search_item"));
+
+        final ItemStack selected = stack.copy();
+        selected.setCount(1);
+        selectedGrid.set(slot, selected);
+        updateGridIcons();
     }
 
     private void selectPreviousRecipe()
@@ -161,7 +216,6 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void applySelectedRecipe()
     {
-        this.activeSlot = 0;
 
         for (int i = 0; i < GRID_SIZE; i++)
         {
@@ -173,7 +227,6 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         if (selectedRecipe == null)
         {
             updateRequestDetails();
-            updateMatchesList();
             updateGridIcons();
             return;
         }
@@ -207,24 +260,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         updateRequestDetails();
-        updateMatchesList();
         updateGridIcons();
     }
 
     private void setActiveSlot(final int slot)
     {
-        this.activeSlot = slot;
         updateRequestDetails();
-        updateMatchesList();
-    }
-
-    private void assignMatchToActiveSlot(@NotNull final ItemStorage match)
-    {
-        final ItemStack chosen = match.getItemStack().copy();
-        chosen.setCount(1);
-        selectedGrid.set(activeSlot, chosen);
-        updateGridIcons();
-        updateMatchesList();
     }
 
     private void clearGrid()
@@ -235,7 +276,6 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         updateGridIcons();
-        updateMatchesList();
     }
 
     private void craft()
@@ -257,7 +297,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void performCraft(final int craftCount)
     {
-        if (getSelectedRecipe() == null)
+        if (getActiveRecipe() == null)
         {
             statusLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.norecipe"));
             return;
@@ -281,7 +321,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private int getCraftAllCount()
     {
-        final RecipeHolder<CraftingRecipe> selectedRecipe = getSelectedRecipe();
+        final RecipeHolder<CraftingRecipe> selectedRecipe = getActiveRecipe();
         if (selectedRecipe == null)
         {
             return 0;
@@ -411,7 +451,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private ItemStack getRequestPreviewOutput()
     {
-        final RecipeHolder<CraftingRecipe> selectedRecipe = getSelectedRecipe();
+        final RecipeHolder<CraftingRecipe> selectedRecipe = getActiveRecipe();
         final Level level = Minecraft.getInstance().level;
         if (selectedRecipe != null && level != null)
         {
@@ -678,32 +718,69 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matchingRecipes.get(selectedRecipeIndex);
     }
 
+    private @Nullable RecipeHolder<CraftingRecipe> getActiveRecipe()
+    {
+        final RecipeHolder<CraftingRecipe> selectedRecipe = getSelectedRecipe();
+        return selectedRecipe != null ? selectedRecipe : getCurrentGridRecipe();
+    }
+
+    private void clearRequestSelection()
+    {
+        this.selectedRequest = null;
+        this.requestOutputs.clear();
+    }
+
+    private void clearJeiSelection(final boolean clearGrid)
+    {
+        this.matchingRecipes.clear();
+        this.selectedRecipeIndex = -1;
+        this.jeiSearchOutput = ItemStack.EMPTY;
+
+        if (clearGrid)
+        {
+            for (int i = 0; i < GRID_SIZE; i++)
+            {
+                slotMatches.get(i).clear();
+                selectedGrid.set(i, ItemStack.EMPTY);
+            }
+        }
+    }
+
     private void updateRequestDetails()
     {
         if (selectedRequest == null)
         {
+            outputLabel.setText(jeiSearchOutput.isEmpty()
+                ? Component.translatable("com.warehouseworkshop.core.gui.workshop.request_item")
+                : Component.translatable("com.warehouseworkshop.core.gui.workshop.search_item"));
             requestLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.request.none"));
-            requestIcon.setItem(ItemStack.EMPTY);
+            requestIcon.setItem(jeiSearchOutput);
         }
         else
         {
+            outputLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.request_item"));
             requestLabel.setText(selectedRequest.getShortDisplayString().copy());
             requestIcon.setItem(getRequestPreviewOutput());
         }
 
-        slotLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.slot", activeSlot + 1));
+        // slotLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.slot", activeSlot + 1));
 
         final RecipeHolder<CraftingRecipe> selectedRecipe = getSelectedRecipe();
-        if (selectedRecipe == null)
+        final RecipeHolder<CraftingRecipe> activeRecipe = getActiveRecipe();
+        if (activeRecipe == null)
         {
             recipeLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.recipe.none"));
             outputIcon.setItem(ItemStack.EMPTY);
-            statusLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.selectrequest"));
+            statusLabel.setText(selectedGrid.stream().allMatch(ItemStack::isEmpty)
+                ? Component.translatable("com.warehouseworkshop.core.gui.workshop.status.selectrequest")
+                : Component.translatable("com.warehouseworkshop.core.gui.workshop.status.invalid"));
             return;
         }
 
         final ItemStack currentGridOutput = getCurrentGridOutput();
-        recipeLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.recipe.index", selectedRecipeIndex + 1, matchingRecipes.size()));
+        recipeLabel.setText(selectedRecipe != null
+            ? Component.translatable("com.warehouseworkshop.core.gui.workshop.recipe.index", selectedRecipeIndex + 1, matchingRecipes.size())
+            : Component.translatable("com.warehouseworkshop.core.gui.workshop.recipe.manual"));
         outputIcon.setItem(currentGridOutput);
         if (!isGridCraftable())
         {
@@ -725,48 +802,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         updateRequestDetails();
     }
-
-    private void updateMatchesList()
-    {
-        matchesList.setDataProvider(new ScrollingList.DataProvider()
-        {
-            @Override
-            public int getElementCount()
-            {
-                return (slotMatches.get(activeSlot).size() + MATCH_COLUMNS - 1) / MATCH_COLUMNS;
-            }
-
-            @Override
-            public void updateElement(final int index, @NotNull final Pane rowPane)
-            {
-                for (int column = 0; column < MATCH_COLUMNS; column++)
-                {
-                    final int matchIndex = (index * MATCH_COLUMNS) + column;
-                    final ItemIcon icon = rowPane.findPaneOfTypeByID("matchIcon" + column, ItemIcon.class);
-                    final Text qty = rowPane.findPaneOfTypeByID("matchQty" + column, Text.class);
-                    final Button useButton = rowPane.findPaneOfTypeByID("matchUse" + column, Button.class);
-
-                    if (matchIndex < slotMatches.get(activeSlot).size())
-                    {
-                        final ItemStorage storage = slotMatches.get(activeSlot).get(matchIndex);
-                        icon.setItem(storage.getItemStack());
-                        qty.setText(Component.literal(Integer.toString(storage.getAmount())));
-                        useButton.setHandler(button -> assignMatchToActiveSlot(storage));
-                    }
-                    else
-                    {
-                        icon.setItem(ItemStack.EMPTY);
-                        qty.setText(Component.empty());
-                        useButton.setHandler(button -> {});
-                    }
-                }
-            }
-        });
-    }
 }
-
-
-
 
 
 

@@ -1,8 +1,8 @@
 <window xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/ldtteam/BlockUI/version/main/src/main/resources/assets/blockui/gui/block_ui.xsd"
-    size="240 244">
-    <image source="minecolonies:textures/gui/builderhut/builder_paper.png" size="240 244"/>
+    size="240 294">
+    <image source="minecolonies:textures/gui/builderhut/builder_paper.png" size="240 294"/>
 
-    <text id="desc" size="120 11" pos="35 10" textalign="MIDDLE" color="black"
+    <text id="desc" size="120 11" pos="60 10" textalign="MIDDLE" color="black"
            label="$(com.warehouseworkshop.core.gui.workshop.title)"/>
 
     <box pos="12 28" size="78 78" linewidth="1"/>
@@ -30,8 +30,8 @@
 
     <box pos="98 28" size="130 78" linewidth="1"/>
     <text id="recipeLabel" size="118 10" pos="104 31" textalign="MIDDLE" color="black"/>
-    <text size="50 10" pos="110 45" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.request)"/>
-    <text size="50 10" pos="169 45" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.output)"/>
+    <text id="outputLabel" size="50 10" pos="110 45" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.request_item)"/>
+    <text id="craftedOutputLabel" size="50 10" pos="169 45" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.output)"/>
     <itemicon id="requestPreview" size="18 18" pos="113 56"/>
     <itemicon id="outputPreview" size="18 18" pos="172 56"/>
     <button id="request" size="16 16" pos="105 81"
@@ -43,53 +43,18 @@
             source="minecolonies:textures/gui/builderhut/builder_button_mini.png"
             label="&gt;"/>
 
-    <box pos="12 112" size="216 48" linewidth="1"/>
+    <box pos="12 112" size="216 36" linewidth="1"/>
     <text id="requestLabel" size="204 10" pos="18 118" color="black"/>
-    <text id="slotLabel" size="204 10" pos="18 130" color="black"/>
-    <text id="statusLabel" size="204 18" pos="18 141" color="black"/>
+    <text id="statusLabel" size="204 18" pos="18 130" color="black"/>
 
-    <text size="90 10" pos="50 164" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.matches)"/>
-    <list id="matches" size="212 36" pos="14 176">
-        <view size="100% 18">
-            <itemicon id="matchIcon0" size="18 18" pos="0 0"/>
-            <itemicon id="matchIcon1" size="18 18" pos="18 0"/>
-            <itemicon id="matchIcon2" size="18 18" pos="36 0"/>
-            <itemicon id="matchIcon3" size="18 18" pos="54 0"/>
-            <itemicon id="matchIcon4" size="18 18" pos="72 0"/>
-            <itemicon id="matchIcon5" size="18 18" pos="90 0"/>
-            <itemicon id="matchIcon6" size="18 18" pos="108 0"/>
-            <itemicon id="matchIcon7" size="18 18" pos="126 0"/>
-            <itemicon id="matchIcon8" size="18 18" pos="144 0"/>
-
-            <text id="matchQty0" size="18 8" pos="0 10" textalign="MIDDLE" color="black"/>
-            <text id="matchQty1" size="18 8" pos="18 10" textalign="MIDDLE" color="black"/>
-            <text id="matchQty2" size="18 8" pos="36 10" textalign="MIDDLE" color="black"/>
-            <text id="matchQty3" size="18 8" pos="54 10" textalign="MIDDLE" color="black"/>
-            <text id="matchQty4" size="18 8" pos="72 10" textalign="MIDDLE" color="black"/>
-            <text id="matchQty5" size="18 8" pos="90 10" textalign="MIDDLE" color="black"/>
-            <text id="matchQty6" size="18 8" pos="108 10" textalign="MIDDLE" color="black"/>
-            <text id="matchQty7" size="18 8" pos="126 10" textalign="MIDDLE" color="black"/>
-            <text id="matchQty8" size="18 8" pos="144 10" textalign="MIDDLE" color="black"/>
-
-            <button id="matchUse0" size="18 18" pos="0 0" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-            <button id="matchUse1" size="18 18" pos="18 0" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-            <button id="matchUse2" size="18 18" pos="36 0" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-            <button id="matchUse3" size="18 18" pos="54 0" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-            <button id="matchUse4" size="18 18" pos="72 0" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-            <button id="matchUse5" size="18 18" pos="90 0" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-            <button id="matchUse6" size="18 18" pos="108 0" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-            <button id="matchUse7" size="18 18" pos="126 0" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-            <button id="matchUse8" size="18 18" pos="144 0" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-        </view>
-    </list>
-
-    <button id="clear" size="52 16" pos="37 222" color="black"
+    <button id="clear" size="52 16" pos="37 265" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.clear)"/>
-    <button id="craftAll" size="52 16" pos="94 222" color="black"
+    <button id="craftAll" size="52 16" pos="94 265" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.craft_all)"/>
-    <button id="craft" size="52 16" pos="151 222" color="black"
+    <button id="craft" size="52 16" pos="151 265" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.craft)"/>
 </window>
+
