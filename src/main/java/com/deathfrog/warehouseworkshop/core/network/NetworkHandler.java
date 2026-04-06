@@ -21,5 +21,6 @@ public final class NetworkHandler
         final PayloadRegistrar registrar = event.registrar(WarehouseWorkshopMod.MODID).versioned(modVersion);
         registrar.playToServer(WorkshopCraftMessage.ID, WorkshopCraftMessage.STREAM_CODEC, WorkshopCraftMessage::onExecute);
         registrar.playToServer(SetWorkshopOutputTargetMessage.ID, SetWorkshopOutputTargetMessage.STREAM_CODEC, SetWorkshopOutputTargetMessage::onExecute);
+        registrar.playToServer(SetWorkshopIncludePlayerInventoryMessage.ID, SetWorkshopIncludePlayerInventoryMessage.STREAM_CODEC, SetWorkshopIncludePlayerInventoryMessage::onExecute);
     }
 }

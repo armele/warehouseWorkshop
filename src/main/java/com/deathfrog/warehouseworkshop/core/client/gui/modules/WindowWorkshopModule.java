@@ -14,6 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.api.colony.buildings.moduleviews.WorkshopModuleView;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
+import com.deathfrog.warehouseworkshop.core.network.SetWorkshopIncludePlayerInventoryMessage;
 import com.deathfrog.warehouseworkshop.core.network.SetWorkshopOutputTargetMessage;
 import com.deathfrog.warehouseworkshop.core.network.WorkshopCraftMessage;
 import com.ldtteam.blockui.Color;
@@ -66,8 +67,10 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private final Text outputLabel;
     private final Text statusLabel;
     private final Button outputTargetButton;
+    private final Button includePlayerInventoryButton;
 
     private final Map<ItemStorage, Integer> warehouseStock = new HashMap<>();
+    private final Map<ItemStorage, Integer> playerStock = new HashMap<>();
     private final List<ItemStack> requestOutputs = new ArrayList<>();
     private final List<RecipeHolder<CraftingRecipe>> matchingRecipes = new ArrayList<>();
 
@@ -94,6 +97,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         this.outputLabel = window.findPaneOfTypeByID("outputLabel", Text.class);
         this.statusLabel = window.findPaneOfTypeByID("statusLabel", Text.class);
         this.outputTargetButton = window.findPaneOfTypeByID("outputTarget", Button.class);
+        this.includePlayerInventoryButton = window.findPaneOfTypeByID("includePlayerInventory", Button.class);
 
         registerButton("request", this::showRequests);
         registerButton("clear", this::clearGrid);
@@ -102,6 +106,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         registerButton("prevRecipe", this::selectPreviousRecipe);
         registerButton("nextRecipe", this::selectNextRecipe);
         registerButton("outputTarget", this::toggleOutputTarget);
+        registerButton("includePlayerInventory", this::toggleIncludePlayerInventory);
 
         Button requestButton = window.findPaneOfTypeByID("request", Button.class);
         PaneBuilders.tooltipBuilder()
@@ -123,7 +128,9 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
         super.onOpened();
         refreshWarehouseStock();
+        refreshPlayerInventoryStock();
         updateOutputTargetButton();
+        updateIncludePlayerInventoryButton();
         updateRequestDetails();
         updateGridIcons();
     }
@@ -138,6 +145,16 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         updateOutputTargetButton();
     }
 
+    private void toggleIncludePlayerInventory()
+    {
+        final boolean includePlayerInventory = !moduleView.shouldIncludePlayerInventory();
+        moduleView.setIncludePlayerInventory(includePlayerInventory);
+        new SetWorkshopIncludePlayerInventoryMessage(buildingView.getPosition(), includePlayerInventory).sendToServer();
+        refreshPlayerInventoryStock();
+        updateIncludePlayerInventoryButton();
+        applySelectedRecipe();
+    }
+
     private void updateOutputTargetButton()
     {
         outputTargetButton.setText(Component.translatable(moduleView.getOutputTarget() == OutputTarget.WAREHOUSE_INVENTORY
@@ -145,9 +162,17 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             : "com.warehouseworkshop.core.gui.workshop.output_target.inventory"));
     }
 
+    private void updateIncludePlayerInventoryButton()
+    {
+        includePlayerInventoryButton.setText(Component.translatable(moduleView.shouldIncludePlayerInventory()
+            ? "com.warehouseworkshop.core.gui.workshop.include_player_inventory.yes"
+            : "com.warehouseworkshop.core.gui.workshop.include_player_inventory.no"));
+    }
+
     private void showRequests()
     {
         refreshWarehouseStock();
+        refreshPlayerInventoryStock();
         new WindowWorkshopSelectRequest(moduleView, this::matchingRequest, this::reopenWithRequest).open();
     }
 
@@ -174,6 +199,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         this.selectedRequest = request;
         this.requestOutputs.clear();
         this.requestOutputs.addAll(extractRequestedOutputs(request));
+        refreshPlayerInventoryStock();
         this.matchingRecipes.addAll(findMatchingRecipes(this.requestOutputs, false));
         this.selectedRecipeIndex = this.matchingRecipes.isEmpty() ? -1 : 0;
         applySelectedRecipe();
@@ -187,6 +213,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         clearRequestSelection();
+        refreshPlayerInventoryStock();
         this.jeiSearchOutput = output.copy();
         this.jeiSearchOutput.setCount(1);
         outputLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.search_item"));
@@ -254,6 +281,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         final List<Ingredient> slottedIngredients = buildSlottedIngredients(selectedRecipe.value());
         final Map<ItemStorage, Integer> remainingStock = new HashMap<>(warehouseStock);
+        final Map<ItemStorage, Integer> remainingPlayerStock = new HashMap<>(playerStock);
 
         for (int slot = 0; slot < GRID_SIZE; slot++)
         {
@@ -266,22 +294,37 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             final List<ItemStorage> matches = findWarehouseMatches(ingredient);
             slotMatches.get(slot).addAll(matches);
 
-            for (final ItemStorage match : matches)
+            if (tryReserveSlotFromMatches(slot, matches, remainingStock))
             {
-                final int available = remainingStock.getOrDefault(match, 0);
-                if (available > 0)
-                {
-                    final ItemStack chosen = match.getItemStack().copy();
-                    chosen.setCount(1);
-                    selectedGrid.set(slot, chosen);
-                    remainingStock.put(match, available - 1);
-                    break;
-                }
+                continue;
+            }
+
+            if (moduleView.shouldIncludePlayerInventory())
+            {
+                tryReserveSlotFromMatches(slot, findPlayerInventoryMatches(ingredient), remainingPlayerStock);
             }
         }
 
         updateRequestDetails();
         updateGridIcons();
+    }
+
+    private boolean tryReserveSlotFromMatches(final int slot, final List<ItemStorage> matches, final Map<ItemStorage, Integer> remainingStock)
+    {
+        for (final ItemStorage match : matches)
+        {
+            final int available = remainingStock.getOrDefault(match, 0);
+            if (available > 0)
+            {
+                final ItemStack chosen = match.getItemStack().copy();
+                chosen.setCount(1);
+                selectedGrid.set(slot, chosen);
+                remainingStock.put(match, available - 1);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void setActiveSlot(final int slot)
@@ -306,7 +349,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         final int craftCount = getCraftAllCount();
         if (craftCount <= 0)
         {
-            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"));
+            setStatusText(getMissingStatusText());
             return;
         }
 
@@ -323,7 +366,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         if (!isGridCraftable())
         {
-            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"));
+            setStatusText(getMissingStatusText());
             return;
         }
 
@@ -334,6 +377,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                 : "com.warehouseworkshop.core.gui.workshop.status.sent.all",
             craftCount));
         refreshWarehouseStock();
+        refreshPlayerInventoryStock();
         applySelectedRecipe();
     }
 
@@ -353,13 +397,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         final ItemStack recipeOutput = selectedRecipe.value().getResultItem(level.registryAccess());
         final int requestedCrafts = getRequestedCraftCount(recipeOutput);
-        final int warehouseCrafts = getWarehouseSupportedCraftCount();
+        final int supportedCrafts = getSupportedCraftCount();
         if (requestedCrafts <= 0)
         {
-            return warehouseCrafts;
+            return supportedCrafts;
         }
 
-        return Math.min(requestedCrafts, warehouseCrafts);
+        return Math.min(requestedCrafts, supportedCrafts);
     }
 
     private int getRequestedCraftCount(final ItemStack recipeOutput)
@@ -398,7 +442,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return requestedOutputCount;
     }
 
-    private int getWarehouseSupportedCraftCount()
+    private int getSupportedCraftCount()
     {
         final Map<ItemStorage, Integer> requiredPerCraft = new HashMap<>();
         for (final ItemStack stack : selectedGrid)
@@ -417,11 +461,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         int supportedCrafts = Integer.MAX_VALUE;
         for (final Map.Entry<ItemStorage, Integer> entry : requiredPerCraft.entrySet())
         {
-            final int available = warehouseStock.entrySet().stream()
-                .filter(candidate -> Objects.equals(candidate.getKey(), entry.getKey()))
-                .mapToInt(Map.Entry::getValue)
-                .sum();
-            supportedCrafts = Math.min(supportedCrafts, available / entry.getValue());
+            supportedCrafts = Math.min(supportedCrafts, getAvailableIngredientCount(entry.getKey()) / entry.getValue());
         }
 
         return supportedCrafts == Integer.MAX_VALUE ? 0 : supportedCrafts;
@@ -429,7 +469,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private boolean isGridCraftable()
     {
-        return getCurrentGridRecipe() != null && hasWarehouseContents(List.copyOf(selectedGrid));
+        return getCurrentGridRecipe() != null && hasCraftingContents(List.copyOf(selectedGrid));
     }
 
     private @Nullable RecipeHolder<CraftingRecipe> getCurrentGridRecipe()
@@ -513,6 +553,25 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
     }
 
+    private void refreshPlayerInventoryStock()
+    {
+        playerStock.clear();
+
+        final Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null)
+        {
+            return;
+        }
+
+        for (final ItemStack stack : minecraft.player.getInventory().items)
+        {
+            if (!stack.isEmpty())
+            {
+                playerStock.merge(new ItemStorage(stack.copy()), stack.getCount(), Integer::sum);
+            }
+        }
+    }
+
     private List<RecipeHolder<CraftingRecipe>> findMatchingRecipes(final List<ItemStack> requestedOutputs, final boolean requireWarehouseContents)
     {
         final Level level = Minecraft.getInstance().level;
@@ -553,6 +612,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         final List<Ingredient> slottedIngredients = buildSlottedIngredients(recipe);
         final List<List<ItemStorage>> matches = new ArrayList<>(GRID_SIZE);
         final Map<ItemStorage, Integer> remainingStock = new HashMap<>(warehouseStock);
+        final Map<ItemStorage, Integer> remainingPlayerStock = new HashMap<>(playerStock);
 
         for (int i = 0; i < GRID_SIZE; i++)
         {
@@ -568,32 +628,42 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             }
 
             final List<ItemStorage> candidates = findWarehouseMatches(ingredient);
-            if (candidates.isEmpty())
-            {
-                return null;
-            }
-
             matches.get(slot).addAll(candidates);
 
-            boolean reserved = false;
-            for (final ItemStorage candidate : candidates)
+            if (reserveFirstAvailable(candidates, remainingStock))
             {
-                final int available = remainingStock.getOrDefault(candidate, 0);
-                if (available > 0)
+                continue;
+            }
+
+            if (moduleView.shouldIncludePlayerInventory())
+            {
+                final List<ItemStorage> playerCandidates = findPlayerInventoryMatches(ingredient);
+                matches.get(slot).addAll(playerCandidates);
+                if (reserveFirstAvailable(playerCandidates, remainingPlayerStock))
                 {
-                    remainingStock.put(candidate, available - 1);
-                    reserved = true;
-                    break;
+                    continue;
                 }
             }
 
-            if (!reserved)
-            {
-                return null;
-            }
+            return null;
         }
 
         return matches;
+    }
+
+    private boolean reserveFirstAvailable(final List<ItemStorage> candidates, final Map<ItemStorage, Integer> remainingStock)
+    {
+        for (final ItemStorage candidate : candidates)
+        {
+            final int available = remainingStock.getOrDefault(candidate, 0);
+            if (available > 0)
+            {
+                remainingStock.put(candidate, available - 1);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private List<Ingredient> buildSlottedIngredients(final CraftingRecipe recipe)
@@ -633,9 +703,19 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private List<ItemStorage> findWarehouseMatches(final Ingredient ingredient)
     {
+        return findMatches(ingredient, warehouseStock);
+    }
+
+    private List<ItemStorage> findPlayerInventoryMatches(final Ingredient ingredient)
+    {
+        return findMatches(ingredient, playerStock);
+    }
+
+    private List<ItemStorage> findMatches(final Ingredient ingredient, final Map<ItemStorage, Integer> stock)
+    {
         final List<ItemStorage> matches = new ArrayList<>();
 
-        for (final Map.Entry<ItemStorage, Integer> entry : warehouseStock.entrySet())
+        for (final Map.Entry<ItemStorage, Integer> entry : stock.entrySet())
         {
             if (entry.getValue() > 0 && ingredient.test(entry.getKey().getItemStack()))
             {
@@ -698,7 +778,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return outputs;
     }
 
-    private boolean hasWarehouseContents(final List<ItemStack> stacks)
+    private boolean hasCraftingContents(final List<ItemStack> stacks)
     {
         final Map<ItemStorage, Integer> required = new HashMap<>();
 
@@ -712,18 +792,32 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         for (final Map.Entry<ItemStorage, Integer> entry : required.entrySet())
         {
-            final int available = warehouseStock.entrySet().stream()
-                .filter(candidate -> Objects.equals(candidate.getKey(), entry.getKey()))
-                .mapToInt(Map.Entry::getValue)
-                .sum();
-
-            if (available < entry.getValue())
+            if (getAvailableIngredientCount(entry.getKey()) < entry.getValue())
             {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private int getAvailableIngredientCount(final ItemStorage ingredient)
+    {
+        int available = getStockCount(warehouseStock, ingredient);
+        if (moduleView.shouldIncludePlayerInventory())
+        {
+            available += getStockCount(playerStock, ingredient);
+        }
+
+        return available;
+    }
+
+    private int getStockCount(final Map<ItemStorage, Integer> stock, final ItemStorage ingredient)
+    {
+        return stock.entrySet().stream()
+            .filter(candidate -> Objects.equals(candidate.getKey(), ingredient))
+            .mapToInt(Map.Entry::getValue)
+            .sum();
     }
 
     private @Nullable RecipeHolder<CraftingRecipe> getSelectedRecipe()
@@ -810,13 +904,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         outputIcon.setItem(currentGridOutput);
         if (!isGridCraftable())
         {
-            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"));
+            setStatusText(getMissingStatusText());
             return;
         }
 
         if (doesCurrentGridMatchRequest())
         {
-            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.ready"));
+            setStatusText(getReadyStatusText());
             return;
         }
 
@@ -825,11 +919,25 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             STATUS_MISMATCH_TEXT_COLOR);
     }
 
+    private Component getReadyStatusText()
+    {
+        return Component.translatable(moduleView.shouldIncludePlayerInventory()
+            ? "com.warehouseworkshop.core.gui.workshop.status.ready.include_player"
+            : "com.warehouseworkshop.core.gui.workshop.status.ready");
+    }
+
+    private Component getMissingStatusText()
+    {
+        return Component.translatable(moduleView.shouldIncludePlayerInventory()
+            ? "com.warehouseworkshop.core.gui.workshop.status.missing.include_player"
+            : "com.warehouseworkshop.core.gui.workshop.status.missing");
+    }
+
     private void setStatusText(final Component status)
     {
         setStatusText(status, STATUS_TEXT_COLOR);
     }
-
+    
     private void setStatusText(final Component status, final int color)
     {
         statusLabel.setTextColor(color);

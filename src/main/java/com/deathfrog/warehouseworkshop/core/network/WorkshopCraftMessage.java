@@ -1,7 +1,9 @@
 package com.deathfrog.warehouseworkshop.core.network;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.jetbrains.annotations.NotNull;
@@ -27,6 +29,7 @@ import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
+import net.neoforged.neoforge.items.wrapper.PlayerMainInvWrapper;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -93,9 +96,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         }
 
         final List<ItemStack> baseIngredients = copyIngredients(normalizedGrid);
-        if (!InventoryUtils.areAllItemsInItemHandler(copyIngredients(baseIngredients), building.getItemHandlerCap()))
+        final boolean includePlayerInventory = module.shouldIncludePlayerInventory();
+        final IItemHandler warehouseInventory = building.getItemHandlerCap();
+        final IItemHandler playerInventory = new PlayerMainInvWrapper(player.getInventory());
+        if (!hasCraftingIngredients(copyIngredients(baseIngredients), warehouseInventory, playerInventory, includePlayerInventory))
         {
-            player.displayClientMessage(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"), true);
+            player.displayClientMessage(getMissingStatusText(includePlayerInventory), true);
             return;
         }
 
@@ -107,27 +113,27 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         for (int i = 0; i < craftCount; i++)
         {
             final List<ItemStack> ingredients = copyIngredients(baseIngredients);
-            if (!InventoryUtils.areAllItemsInItemHandler(copyIngredients(ingredients), building.getItemHandlerCap()))
+            if (!hasCraftingIngredients(copyIngredients(ingredients), warehouseInventory, playerInventory, includePlayerInventory))
             {
                 break;
             }
 
-            if (!InventoryUtils.removeStacksFromItemHandler(building.getItemHandlerCap(), ingredients))
+            if (!removeIngredients(ingredients, warehouseInventory, playerInventory, includePlayerInventory))
             {
                 break;
             }
 
-            giveCraftingOutput(player, building.getItemHandlerCap(), craftedResult.copy(), outputTarget);
+            giveCraftingOutput(player, warehouseInventory, craftedResult.copy(), outputTarget);
             for (final ItemStack remainder : remainingItems)
             {
-                giveCraftingOutput(player, building.getItemHandlerCap(), remainder.copy(), outputTarget);
+                giveCraftingOutput(player, warehouseInventory, remainder.copy(), outputTarget);
             }
             crafted++;
         }
 
         if (crafted <= 0)
         {
-            player.displayClientMessage(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.missing"), true);
+            player.displayClientMessage(getMissingStatusText(includePlayerInventory), true);
             return;
         }
 
@@ -145,6 +151,129 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             }
         }
         return copies;
+    }
+
+    private static boolean hasCraftingIngredients(
+        final List<ItemStack> ingredients,
+        final IItemHandler warehouseInventory,
+        final IItemHandler playerInventory,
+        final boolean includePlayerInventory)
+    {
+        if (!includePlayerInventory)
+        {
+            return InventoryUtils.areAllItemsInItemHandler(ingredients, warehouseInventory);
+        }
+
+        final Map<ItemStack, Integer> required = countRequiredIngredients(ingredients);
+        for (final Map.Entry<ItemStack, Integer> entry : required.entrySet())
+        {
+            final int available = countMatchingItems(warehouseInventory, entry.getKey()) + countMatchingItems(playerInventory, entry.getKey());
+            if (available < entry.getValue())
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean removeIngredients(
+        final List<ItemStack> ingredients,
+        final IItemHandler warehouseInventory,
+        final IItemHandler playerInventory,
+        final boolean includePlayerInventory)
+    {
+        if (!includePlayerInventory)
+        {
+            return InventoryUtils.removeStacksFromItemHandler(warehouseInventory, ingredients);
+        }
+
+        for (final Map.Entry<ItemStack, Integer> entry : countRequiredIngredients(ingredients).entrySet())
+        {
+            int remaining = removeMatchingItems(warehouseInventory, entry.getKey(), entry.getValue());
+            if (remaining > 0)
+            {
+                remaining = removeMatchingItems(playerInventory, entry.getKey(), remaining);
+            }
+
+            if (remaining > 0)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static Map<ItemStack, Integer> countRequiredIngredients(final List<ItemStack> ingredients)
+    {
+        final Map<ItemStack, Integer> required = new HashMap<>();
+        for (final ItemStack ingredient : ingredients)
+        {
+            if (ingredient.isEmpty())
+            {
+                continue;
+            }
+
+            final ItemStack single = ingredient.copy();
+            single.setCount(1);
+            mergeRequiredIngredient(required, single, ingredient.getCount());
+        }
+
+        return required;
+    }
+
+    private static void mergeRequiredIngredient(final Map<ItemStack, Integer> required, final ItemStack ingredient, final int count)
+    {
+        for (final Map.Entry<ItemStack, Integer> entry : required.entrySet())
+        {
+            if (ItemStack.isSameItemSameComponents(entry.getKey(), ingredient))
+            {
+                entry.setValue(entry.getValue() + count);
+                return;
+            }
+        }
+
+        required.put(ingredient.copy(), count);
+    }
+
+    private static int countMatchingItems(final IItemHandler inventory, final ItemStack target)
+    {
+        int count = 0;
+        for (int slot = 0; slot < inventory.getSlots(); slot++)
+        {
+            final ItemStack stack = inventory.getStackInSlot(slot);
+            if (!stack.isEmpty() && ItemStack.isSameItemSameComponents(stack, target))
+            {
+                count += stack.getCount();
+            }
+        }
+
+        return count;
+    }
+
+    private static int removeMatchingItems(final IItemHandler inventory, final ItemStack target, final int count)
+    {
+        int remaining = count;
+        for (int slot = 0; slot < inventory.getSlots() && remaining > 0; slot++)
+        {
+            final ItemStack stack = inventory.getStackInSlot(slot);
+            if (stack.isEmpty() || !ItemStack.isSameItemSameComponents(stack, target))
+            {
+                continue;
+            }
+
+            remaining -= inventory.extractItem(slot, remaining, false).getCount();
+        }
+
+        return remaining;
+    }
+
+    private static Component getMissingStatusText(final boolean includePlayerInventory)
+    {
+        return Component.translatable(includePlayerInventory
+            ? "com.warehouseworkshop.core.gui.workshop.status.missing.include_player"
+            : "com.warehouseworkshop.core.gui.workshop.status.missing");
     }
 
     private static void giveToPlayer(final Player player, final ItemStack stack)

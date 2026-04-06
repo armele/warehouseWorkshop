@@ -14,11 +14,13 @@ import net.minecraft.network.chat.Component;
 public class WorkshopModuleView  extends AbstractBuildingModuleView
 {
     private OutputTarget outputTarget = OutputTarget.PLAYER_INVENTORY;
+    private boolean includePlayerInventory = false;
 
     @Override
     public void deserialize(@NotNull RegistryFriendlyByteBuf arg0)
     {
         outputTarget = OutputTarget.byId(arg0.readInt());
+        includePlayerInventory = arg0.readBoolean();
     }
 
     @Override
@@ -52,5 +54,15 @@ public class WorkshopModuleView  extends AbstractBuildingModuleView
     public void setOutputTarget(final OutputTarget outputTarget)
     {
         this.outputTarget = outputTarget;
+    }
+
+    public boolean shouldIncludePlayerInventory()
+    {
+        return includePlayerInventory;
+    }
+
+    public void setIncludePlayerInventory(final boolean includePlayerInventory)
+    {
+        this.includePlayerInventory = includePlayerInventory;
     }
 }

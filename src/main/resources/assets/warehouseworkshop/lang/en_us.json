@@ -18,8 +18,10 @@
   "com.warehouseworkshop.core.gui.workshop.status.selectrequest": "Pick an open request, drag a JEI recipe, or shift-click a JEI item to begin.",
   "com.warehouseworkshop.core.gui.workshop.status.norecipe": "Pick a matching recipe first.",
   "com.warehouseworkshop.core.gui.workshop.status.ready": "Ready to craft from warehouse stock.",
+  "com.warehouseworkshop.core.gui.workshop.status.ready.include_player": "Ready to craft from warehouse and player stock.",
   "com.warehouseworkshop.core.gui.workshop.status.validmismatch": "Valid recipe does not match request.",
   "com.warehouseworkshop.core.gui.workshop.status.missing": "Warehouse stock does not satisfy the current grid.",
+  "com.warehouseworkshop.core.gui.workshop.status.missing.include_player": "Warehouse and player stock do not satisfy the current grid.",
   "com.warehouseworkshop.core.gui.workshop.status.sent": "Craft request sent to the server.",
   "com.warehouseworkshop.core.gui.workshop.status.sent.all": "Craft-all request sent for up to %1$s crafts.",
   "com.warehouseworkshop.core.gui.workshop.status.crafted": "Crafted %1$s time(s).",
@@ -28,5 +30,8 @@
   "com.warehouseworkshop.core.gui.workshop.output.tooltip": "Drag a JEI result here, or shift-click a JEI item, to select a craftable recipe. Drag JEI ingredients into the grid.",
   "com.warehouseworkshop.core.gui.workshop.output_target.label": "Craft To",
   "com.warehouseworkshop.core.gui.workshop.output_target.inventory": "Inventory",
-  "com.warehouseworkshop.core.gui.workshop.output_target.warehouse": "Warehouse"
+  "com.warehouseworkshop.core.gui.workshop.output_target.warehouse": "Warehouse",
+  "com.warehouseworkshop.core.gui.workshop.include_player_inventory.label": "Use Player Items",
+  "com.warehouseworkshop.core.gui.workshop.include_player_inventory.no": "No",
+  "com.warehouseworkshop.core.gui.workshop.include_player_inventory.yes": "Yes"
 }
