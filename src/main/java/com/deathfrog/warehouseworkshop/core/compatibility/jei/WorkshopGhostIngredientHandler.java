@@ -39,6 +39,11 @@ public class WorkshopGhostIngredientHandler implements IGhostIngredientHandler<B
         for (int slot = 0; slot < GRID_POSITIONS.length; slot++)
         {
             final int targetSlot = slot;
+            if (!workshopWindow.canAcceptIngredientInSlot(targetSlot))
+            {
+                continue;
+            }
+
             targets.add(new Target<>()
             {
                 @Override

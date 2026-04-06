@@ -43,7 +43,7 @@ public class WorkshopModuleView  extends AbstractBuildingModuleView
     @Override
     public String getIcon()
     {
-        return "crafting";
+        return "workshop";
     }
 
     public OutputTarget getOutputTarget()

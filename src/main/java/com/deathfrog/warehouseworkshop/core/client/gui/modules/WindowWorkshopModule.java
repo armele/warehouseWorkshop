@@ -22,6 +22,12 @@ import com.ldtteam.blockui.PaneBuilders;
 import com.ldtteam.blockui.controls.Button;
 import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
+import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlock;
+import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlockComponent;
+import com.ldtteam.domumornamentum.client.model.data.MaterialTextureData;
+import com.ldtteam.domumornamentum.recipe.ModRecipeTypes;
+import com.ldtteam.domumornamentum.recipe.architectscutter.ArchitectsCutterRecipe;
+import com.ldtteam.domumornamentum.recipe.architectscutter.ArchitectsCutterRecipeInput;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IConcreteDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
@@ -33,9 +39,13 @@ import com.minecolonies.core.tileentities.TileEntityRack;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BlockItemStateProperties;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -45,6 +55,7 @@ import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.item.crafting.ShapelessRecipe;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 /**
@@ -53,10 +64,13 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleView>
 {
     private static final int GRID_SIZE = 9;
+    private static final int DOMUM_FIRST_SLOT = 1;
+    private static final int DOMUM_SECOND_SLOT = 4;
     private static final int STATUS_TEXT_COLOR = Color.getByName("black", 0x000000);
     private static final int STATUS_MISMATCH_TEXT_COLOR = Color.getByName("red", 0xFF0000);
 
     private final List<ItemIcon> gridIcons = new ArrayList<>(GRID_SIZE);
+    private final List<Button> gridButtons = new ArrayList<>(GRID_SIZE);
     private final List<ItemStack> selectedGrid = new ArrayList<>(Collections.nCopies(GRID_SIZE, ItemStack.EMPTY));
     private final List<List<ItemStorage>> slotMatches = new ArrayList<>(GRID_SIZE);
 
@@ -72,7 +86,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private final Map<ItemStorage, Integer> warehouseStock = new HashMap<>();
     private final Map<ItemStorage, Integer> playerStock = new HashMap<>();
     private final List<ItemStack> requestOutputs = new ArrayList<>();
-    private final List<RecipeHolder<CraftingRecipe>> matchingRecipes = new ArrayList<>();
+    private final List<WorkshopRecipe> matchingRecipes = new ArrayList<>();
 
     private @Nullable IRequest<?> selectedRequest;
     private ItemStack jeiSearchOutput = ItemStack.EMPTY;
@@ -87,6 +101,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             slotMatches.add(new ArrayList<>());
             final int slot = i;
             gridIcons.add(window.findPaneOfTypeByID("gridIcon" + i, ItemIcon.class));
+            gridButtons.add(window.findPaneOfTypeByID("gridButton" + i, Button.class));
             registerButton("gridButton" + i, () -> setActiveSlot(slot));
         }
 
@@ -120,6 +135,44 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                     .append(Component.translatable("com.warehouseworkshop.core.gui.workshop.output.tooltip"))
                     .hoverPane(requestIcon)
                     .build();
+        }
+    }
+
+    private enum RecipeKind
+    {
+        CRAFTING(WorkshopCraftMessage.CRAFT_TYPE_CRAFTING),
+        DOMUM(WorkshopCraftMessage.CRAFT_TYPE_DOMUM);
+
+        private final int networkId;
+
+        RecipeKind(final int networkId)
+        {
+            this.networkId = networkId;
+        }
+    }
+
+    private record WorkshopRecipe(
+        RecipeKind kind,
+        ResourceLocation id,
+        ItemStack output,
+        @Nullable RecipeHolder<CraftingRecipe> craftingRecipe,
+        @Nullable RecipeHolder<ArchitectsCutterRecipe> domumRecipe)
+    {
+        static WorkshopRecipe crafting(final RecipeHolder<CraftingRecipe> recipe, final Level level)
+        {
+            return new WorkshopRecipe(
+                RecipeKind.CRAFTING,
+                recipe.id(),
+                recipe.value().getResultItem(level.registryAccess()).copy(),
+                recipe,
+                null);
+        }
+
+        static WorkshopRecipe domum(final RecipeHolder<ArchitectsCutterRecipe> recipe, final ItemStack output)
+        {
+            final ItemStack outputCopy = output.copy();
+            outputCopy.setCount(Math.max(1, outputCopy.getCount()));
+            return new WorkshopRecipe(RecipeKind.DOMUM, recipe.id(), outputCopy, null, recipe);
         }
     }
 
@@ -225,7 +278,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     public void applyJeiIngredientToSlot(final int slot, @NotNull final ItemStack stack)
     {
-        if (slot < 0 || slot >= GRID_SIZE || stack.isEmpty())
+        if (slot < 0 || slot >= GRID_SIZE || stack.isEmpty() || !canAcceptIngredientInSlot(slot))
         {
             return;
         }
@@ -264,14 +317,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void applySelectedRecipe()
     {
-
         for (int i = 0; i < GRID_SIZE; i++)
         {
             slotMatches.get(i).clear();
             selectedGrid.set(i, ItemStack.EMPTY);
         }
 
-        final RecipeHolder<CraftingRecipe> selectedRecipe = getSelectedRecipe();
+        final WorkshopRecipe selectedRecipe = getSelectedRecipe();
         if (selectedRecipe == null)
         {
             updateRequestDetails();
@@ -279,7 +331,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return;
         }
 
-        final List<Ingredient> slottedIngredients = buildSlottedIngredients(selectedRecipe.value());
+        if (selectedRecipe.kind() == RecipeKind.DOMUM)
+        {
+            applySelectedDomumRecipe(selectedRecipe);
+            updateRequestDetails();
+            updateGridIcons();
+            return;
+        }
+
+        final List<Ingredient> slottedIngredients = buildSlottedIngredients(selectedRecipe.craftingRecipe().value());
         final Map<ItemStorage, Integer> remainingStock = new HashMap<>(warehouseStock);
         final Map<ItemStorage, Integer> remainingPlayerStock = new HashMap<>(playerStock);
 
@@ -309,6 +369,36 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         updateGridIcons();
     }
 
+    private void applySelectedDomumRecipe(final WorkshopRecipe selectedRecipe)
+    {
+        final List<DomumSlotRequirement> requirements = getDomumRequirements(selectedRecipe);
+        if (requirements.isEmpty())
+        {
+            return;
+        }
+
+        final Map<ItemStorage, Integer> remainingStock = new HashMap<>(warehouseStock);
+        final Map<ItemStorage, Integer> remainingPlayerStock = new HashMap<>(playerStock);
+        for (int component = 0; component < requirements.size(); component++)
+        {
+            final int slot = domumGridSlot(component);
+            final List<ItemStorage> matches = findDomumMatches(requirements.get(component).material(), warehouseStock);
+            slotMatches.get(slot).addAll(matches);
+
+            if (tryReserveSlotFromMatches(slot, matches, remainingStock))
+            {
+                continue;
+            }
+
+            if (moduleView.shouldIncludePlayerInventory())
+            {
+                final List<ItemStorage> playerMatches = findDomumMatches(requirements.get(component).material(), playerStock);
+                slotMatches.get(slot).addAll(playerMatches);
+                tryReserveSlotFromMatches(slot, playerMatches, remainingPlayerStock);
+            }
+        }
+    }
+
     private boolean tryReserveSlotFromMatches(final int slot, final List<ItemStorage> matches, final Map<ItemStorage, Integer> remainingStock)
     {
         for (final ItemStorage match : matches)
@@ -329,7 +419,23 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void setActiveSlot(final int slot)
     {
+        if (!canAcceptIngredientInSlot(slot))
+        {
+            return;
+        }
+
         updateRequestDetails();
+    }
+
+    public boolean canAcceptIngredientInSlot(final int slot)
+    {
+        if (slot < 0 || slot >= GRID_SIZE)
+        {
+            return false;
+        }
+
+        final WorkshopRecipe selectedRecipe = getSelectedRecipe();
+        return selectedRecipe == null || selectedRecipe.kind() != RecipeKind.DOMUM || slot == DOMUM_FIRST_SLOT || slot == DOMUM_SECOND_SLOT;
     }
 
     private void clearGrid()
@@ -370,7 +476,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return;
         }
 
-        new WorkshopCraftMessage(buildingView.getPosition(), List.copyOf(selectedGrid), craftCount).sendToServer();
+        final WorkshopRecipe activeRecipe = getActiveRecipe();
+        if (activeRecipe == null)
+        {
+            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.norecipe"));
+            return;
+        }
+
+        new WorkshopCraftMessage(buildingView.getPosition(), List.copyOf(selectedGrid), craftCount, activeRecipe.kind().networkId, activeRecipe.id()).sendToServer();
         setStatusText(Component.translatable(
             craftCount == 1
                 ? "com.warehouseworkshop.core.gui.workshop.status.sent"
@@ -383,7 +496,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private int getCraftAllCount()
     {
-        final RecipeHolder<CraftingRecipe> selectedRecipe = getActiveRecipe();
+        final WorkshopRecipe selectedRecipe = getActiveRecipe();
         if (selectedRecipe == null)
         {
             return 0;
@@ -395,7 +508,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return 0;
         }
 
-        final ItemStack recipeOutput = selectedRecipe.value().getResultItem(level.registryAccess());
+        final ItemStack recipeOutput = getCurrentGridOutput();
         final int requestedCrafts = getRequestedCraftCount(recipeOutput);
         final int supportedCrafts = getSupportedCraftCount();
         if (requestedCrafts <= 0)
@@ -469,7 +582,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private boolean isGridCraftable()
     {
-        return getCurrentGridRecipe() != null && hasCraftingContents(List.copyOf(selectedGrid));
+        return getActiveRecipe() != null && !getCurrentGridOutput().isEmpty() && hasCraftingContents(List.copyOf(selectedGrid));
     }
 
     private @Nullable RecipeHolder<CraftingRecipe> getCurrentGridRecipe()
@@ -486,7 +599,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private ItemStack getCurrentGridOutput()
     {
-        final RecipeHolder<CraftingRecipe> currentRecipe = getCurrentGridRecipe();
+        final WorkshopRecipe selectedRecipe = getSelectedRecipe();
+        if (selectedRecipe != null && selectedRecipe.kind() == RecipeKind.DOMUM)
+        {
+            return assembleDomumOutput(selectedRecipe);
+        }
+
+        final RecipeHolder<CraftingRecipe> currentRecipe = selectedRecipe != null && selectedRecipe.craftingRecipe() != null
+            ? selectedRecipe.craftingRecipe()
+            : getCurrentGridRecipe();
         final Level level = Minecraft.getInstance().level;
         if (currentRecipe == null || level == null)
         {
@@ -509,11 +630,10 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private ItemStack getRequestPreviewOutput()
     {
-        final RecipeHolder<CraftingRecipe> selectedRecipe = getActiveRecipe();
-        final Level level = Minecraft.getInstance().level;
-        if (selectedRecipe != null && level != null)
+        final WorkshopRecipe selectedRecipe = getActiveRecipe();
+        if (selectedRecipe != null)
         {
-            final ItemStack recipeOutput = selectedRecipe.value().getResultItem(level.registryAccess()).copy();
+            final ItemStack recipeOutput = selectedRecipe.output().copy();
             final int requestedOutputCount = getRequestedOutputCount(recipeOutput);
             if (requestedOutputCount > 0)
             {
@@ -572,7 +692,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
     }
 
-    private List<RecipeHolder<CraftingRecipe>> findMatchingRecipes(final List<ItemStack> requestedOutputs, final boolean requireWarehouseContents)
+    private List<WorkshopRecipe> findMatchingRecipes(final List<ItemStack> requestedOutputs, final boolean requireWarehouseContents)
     {
         final Level level = Minecraft.getInstance().level;
         if (level == null)
@@ -581,7 +701,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         final RecipeManager recipeManager = level.getRecipeManager();
-        final List<RecipeHolder<CraftingRecipe>> matches = new ArrayList<>();
+        final List<WorkshopRecipe> matches = new ArrayList<>();
 
         for (final RecipeHolder<CraftingRecipe> recipe : recipeManager.getAllRecipesFor(RecipeType.CRAFTING))
         {
@@ -599,11 +719,31 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
             if (!requireWarehouseContents || buildSlotMatches(craftingRecipe) != null)
             {
-                matches.add(recipe);
+                matches.add(WorkshopRecipe.crafting(recipe, level));
             }
         }
 
-        matches.sort(Comparator.comparing(recipe -> recipe.value().getResultItem(level.registryAccess()).getHoverName().getString(), String.CASE_INSENSITIVE_ORDER));
+        for (final RecipeHolder<ArchitectsCutterRecipe> recipe : recipeManager.getAllRecipesFor(ModRecipeTypes.ARCHITECTS_CUTTER.get()))
+        {
+            for (final ItemStack requested : requestedOutputs)
+            {
+                final ItemStack output = buildDomumOutputForRequest(recipe.value(), requested, level);
+                if (output.isEmpty())
+                {
+                    continue;
+                }
+
+                final WorkshopRecipe workshopRecipe = WorkshopRecipe.domum(recipe, output);
+                if (!requireWarehouseContents || buildDomumSlotMatches(workshopRecipe) != null)
+                {
+                    matches.add(workshopRecipe);
+                }
+            }
+        }
+
+        matches.sort(Comparator.comparing((WorkshopRecipe recipe) -> recipe.output().getHoverName().getString(), String.CASE_INSENSITIVE_ORDER)
+            .thenComparing(recipe -> recipe.kind().ordinal())
+            .thenComparing(recipe -> recipe.id().toString()));
         return matches;
     }
 
@@ -649,6 +789,53 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         return matches;
+    }
+
+    private @Nullable List<List<ItemStorage>> buildDomumSlotMatches(final WorkshopRecipe recipe)
+    {
+        final List<DomumSlotRequirement> requirements = getDomumRequirements(recipe);
+        if (requirements.isEmpty())
+        {
+            return null;
+        }
+
+        final List<List<ItemStorage>> matches = new ArrayList<>(GRID_SIZE);
+        final Map<ItemStorage, Integer> remainingStock = new HashMap<>(warehouseStock);
+        final Map<ItemStorage, Integer> remainingPlayerStock = new HashMap<>(playerStock);
+        for (int i = 0; i < GRID_SIZE; i++)
+        {
+            matches.add(new ArrayList<>());
+        }
+
+        for (int component = 0; component < requirements.size(); component++)
+        {
+            final int slot = domumGridSlot(component);
+            final List<ItemStorage> candidates = findDomumMatches(requirements.get(component).material(), warehouseStock);
+            matches.get(slot).addAll(candidates);
+
+            if (reserveFirstAvailable(candidates, remainingStock))
+            {
+                continue;
+            }
+
+            if (moduleView.shouldIncludePlayerInventory())
+            {
+                final List<ItemStorage> playerCandidates = findDomumMatches(requirements.get(component).material(), playerStock);
+                matches.get(slot).addAll(playerCandidates);
+                if (reserveFirstAvailable(playerCandidates, remainingPlayerStock))
+                {
+                    continue;
+                }
+            }
+
+            return null;
+        }
+
+        return matches;
+    }
+
+    private record DomumSlotRequirement(Block material)
+    {
     }
 
     private boolean reserveFirstAvailable(final List<ItemStorage> candidates, final Map<ItemStorage, Integer> remainingStock)
@@ -728,6 +915,149 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         matches.sort(Comparator.comparingInt(ItemStorage::getAmount).reversed()
             .thenComparing(storage -> storage.getItemStack().getHoverName().getString(), String.CASE_INSENSITIVE_ORDER));
         return matches;
+    }
+
+    private List<ItemStorage> findDomumMatches(final Block material, final Map<ItemStorage, Integer> stock)
+    {
+        final List<ItemStorage> matches = new ArrayList<>();
+
+        for (final Map.Entry<ItemStorage, Integer> entry : stock.entrySet())
+        {
+            final ItemStack stack = entry.getKey().getItemStack();
+            if (entry.getValue() > 0 && stack.getItem() instanceof final BlockItem blockItem && blockItem.getBlock() == material)
+            {
+                final ItemStorage display = new ItemStorage(stack.copy(), entry.getKey().ignoreDamageValue(), entry.getKey().ignoreNBT());
+                display.setAmount(entry.getValue());
+                matches.add(display);
+            }
+        }
+
+        matches.sort(Comparator.comparingInt(ItemStorage::getAmount).reversed()
+            .thenComparing(storage -> storage.getItemStack().getHoverName().getString(), String.CASE_INSENSITIVE_ORDER));
+        return matches;
+    }
+
+    private ItemStack buildDomumOutputForRequest(final ArchitectsCutterRecipe recipe, final ItemStack requested, final Level level)
+    {
+        if (requested.isEmpty() || !matchesDomumRecipeResult(recipe.getResultItem(level.registryAccess()), requested))
+        {
+            return ItemStack.EMPTY;
+        }
+
+        final List<IMateriallyTexturedBlockComponent> components = getDomumComponents(recipe);
+        if (components.isEmpty() || components.size() > 2)
+        {
+            return ItemStack.EMPTY;
+        }
+
+        final ItemStack output = requested.copy();
+        if (MaterialTextureData.readFromItemStack(output).isEmpty())
+        {
+            final MaterialTextureData.Builder builder = MaterialTextureData.builder();
+            for (final IMateriallyTexturedBlockComponent component : components)
+            {
+                builder.setComponent(component.getId(), component.getDefault());
+            }
+            builder.writeToItemStack(output);
+        }
+
+        output.setCount(Math.max(components.size(), recipe.getCount()));
+        return output;
+    }
+
+    private boolean matchesDomumRecipeResult(final ItemStack recipeResult, final ItemStack requested)
+    {
+        if (!ItemStack.isSameItem(recipeResult, requested))
+        {
+            return false;
+        }
+
+        final BlockItemStateProperties recipeState = recipeResult.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY);
+        final BlockItemStateProperties requestedState = requested.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY);
+        return recipeState.isEmpty() && requestedState.isEmpty() || recipeState.equals(requestedState);
+    }
+
+    private List<DomumSlotRequirement> getDomumRequirements(final WorkshopRecipe recipe)
+    {
+        if (recipe.domumRecipe() == null)
+        {
+            return List.of();
+        }
+
+        final List<IMateriallyTexturedBlockComponent> components = getDomumComponents(recipe.domumRecipe().value());
+        if (components.isEmpty() || components.size() > 2)
+        {
+            return List.of();
+        }
+
+        final MaterialTextureData textureData = MaterialTextureData.readFromItemStack(recipe.output());
+        final Map<ResourceLocation, Block> materials = textureData.getTexturedComponents();
+        final List<DomumSlotRequirement> requirements = new ArrayList<>(components.size());
+        for (final IMateriallyTexturedBlockComponent component : components)
+        {
+            final Block material = materials.getOrDefault(component.getId(), component.getDefault());
+            if (!material.defaultBlockState().is(component.getValidSkins()))
+            {
+                return List.of();
+            }
+            requirements.add(new DomumSlotRequirement(material));
+        }
+
+        return requirements;
+    }
+
+    private List<IMateriallyTexturedBlockComponent> getDomumComponents(final ArchitectsCutterRecipe recipe)
+    {
+        if (!(recipe.getBlock() instanceof final IMateriallyTexturedBlock texturedBlock))
+        {
+            return List.of();
+        }
+
+        return new ArrayList<>(texturedBlock.getComponents());
+    }
+
+    private ItemStack assembleDomumOutput(final WorkshopRecipe recipe)
+    {
+        if (recipe.domumRecipe() == null)
+        {
+            return ItemStack.EMPTY;
+        }
+
+        final List<DomumSlotRequirement> requirements = getDomumRequirements(recipe);
+        if (requirements.isEmpty())
+        {
+            return ItemStack.EMPTY;
+        }
+
+        final Level level = Minecraft.getInstance().level;
+        if (level == null)
+        {
+            return ItemStack.EMPTY;
+        }
+
+        final SimpleContainer input = new SimpleContainer(requirements.size());
+        for (int component = 0; component < requirements.size(); component++)
+        {
+            final ItemStack stack = selectedGrid.get(domumGridSlot(component));
+            if (stack.isEmpty())
+            {
+                return ItemStack.EMPTY;
+            }
+            input.setItem(component, stack.copy());
+        }
+
+        final ArchitectsCutterRecipeInput recipeInput = new ArchitectsCutterRecipeInput(input);
+        if (!recipe.domumRecipe().value().matches(recipeInput, level))
+        {
+            return ItemStack.EMPTY;
+        }
+
+        return recipe.domumRecipe().value().assemble(recipeInput, level.registryAccess()).copy();
+    }
+
+    private int domumGridSlot(final int component)
+    {
+        return component == 0 ? DOMUM_FIRST_SLOT : DOMUM_SECOND_SLOT;
     }
 
     private List<ItemStack> extractRequestedOutputs(final IRequest<?> request)
@@ -820,7 +1150,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             .sum();
     }
 
-    private @Nullable RecipeHolder<CraftingRecipe> getSelectedRecipe()
+    private @Nullable WorkshopRecipe getSelectedRecipe()
     {
         if (selectedRecipeIndex < 0 || selectedRecipeIndex >= matchingRecipes.size())
         {
@@ -830,10 +1160,17 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matchingRecipes.get(selectedRecipeIndex);
     }
 
-    private @Nullable RecipeHolder<CraftingRecipe> getActiveRecipe()
+    private @Nullable WorkshopRecipe getActiveRecipe()
     {
-        final RecipeHolder<CraftingRecipe> selectedRecipe = getSelectedRecipe();
-        return selectedRecipe != null ? selectedRecipe : getCurrentGridRecipe();
+        final WorkshopRecipe selectedRecipe = getSelectedRecipe();
+        final Level level = Minecraft.getInstance().level;
+        if (selectedRecipe != null || level == null)
+        {
+            return selectedRecipe;
+        }
+
+        final RecipeHolder<CraftingRecipe> currentRecipe = getCurrentGridRecipe();
+        return currentRecipe == null ? null : WorkshopRecipe.crafting(currentRecipe, level);
     }
 
     private void clearRequestSelection()
@@ -885,8 +1222,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         // slotLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.slot", activeSlot + 1));
 
-        final RecipeHolder<CraftingRecipe> selectedRecipe = getSelectedRecipe();
-        final RecipeHolder<CraftingRecipe> activeRecipe = getActiveRecipe();
+        final WorkshopRecipe selectedRecipe = getSelectedRecipe();
+        final WorkshopRecipe activeRecipe = getActiveRecipe();
         if (activeRecipe == null)
         {
             recipeLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.recipe.none"));
@@ -946,9 +1283,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void updateGridIcons()
     {
+        final WorkshopRecipe selectedRecipe = getSelectedRecipe();
+        final boolean domumRecipe = selectedRecipe != null && selectedRecipe.kind() == RecipeKind.DOMUM;
         for (int i = 0; i < GRID_SIZE; i++)
         {
             gridIcons.get(i).setItem(selectedGrid.get(i));
+            gridButtons.get(i).setEnabled(!domumRecipe || i == DOMUM_FIRST_SLOT || i == DOMUM_SECOND_SLOT);
         }
 
         updateRequestDetails();
