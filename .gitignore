@@ -40,3 +40,39 @@ repo/
 !**/src/**/repo/
 /runs
 /runs
+runs/client/logs/2026-04-05-1.log.gz
+runs/client/logs/2026-04-05-2.log.gz
+runs/client/logs/2026-04-05-3.log.gz
+runs/client/logs/2026-04-05-4.log.gz
+runs/client/logs/2026-04-05-5.log.gz
+runs/client/logs/2026-04-05-6.log.gz
+runs/client/logs/2026-04-05-7.log.gz
+runs/client/logs/debug-1.log.gz
+runs/client/logs/debug-2.log.gz
+runs/client/logs/debug-3.log.gz
+runs/client/logs/debug-4.log.gz
+runs/client/logs/debug-5.log.gz
+runs/client/logs/debug.log
+runs/client/logs/latest.log
+runs/client/saves/Warehouse Wonderland/advancements/380df991-f603-344c-a090-369bad2a924a.json
+runs/client/saves/Warehouse Wonderland/data/minecolonies_colony_manager.dat
+runs/client/saves/Warehouse Wonderland/data/raids.dat
+runs/client/saves/Warehouse Wonderland/data/random_sequences.dat
+runs/client/saves/Warehouse Wonderland/DIM-1/data/raids.dat
+runs/client/saves/Warehouse Wonderland/DIM1/data/raids_end.dat
+runs/client/saves/Warehouse Wonderland/entities/r.-1.-1.mca
+runs/client/saves/Warehouse Wonderland/entities/r.-1.0.mca
+runs/client/saves/Warehouse Wonderland/entities/r.0.-1.mca
+runs/client/saves/Warehouse Wonderland/entities/r.0.0.mca
+runs/client/saves/Warehouse Wonderland/level.dat
+runs/client/saves/Warehouse Wonderland/level.dat_old
+runs/client/saves/Warehouse Wonderland/minecolonies/colonies.dat
+runs/client/saves/Warehouse Wonderland/minecolonies/minecraft/overworld/colony1.dat
+runs/client/saves/Warehouse Wonderland/playerdata/380df991-f603-344c-a090-369bad2a924a.dat
+runs/client/saves/Warehouse Wonderland/playerdata/380df991-f603-344c-a090-369bad2a924a.dat_old
+runs/client/saves/Warehouse Wonderland/region/r.-1.-1.mca
+runs/client/saves/Warehouse Wonderland/region/r.-1.0.mca
+runs/client/saves/Warehouse Wonderland/region/r.0.-1.mca
+runs/client/saves/Warehouse Wonderland/region/r.0.0.mca
+runs/client/saves/Warehouse Wonderland/stats/380df991-f603-344c-a090-369bad2a924a.json
+runs/client/usercache.json
