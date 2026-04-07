@@ -47,6 +47,7 @@ public class WindowWorkshopSelectRequest extends AbstractModuleWindow<WorkshopMo
     private final Predicate<IRequest<?>> predicate;
     private final Consumer<IRequest<?>> reopenWithRequest;
     private final ScrollingList requestsList;
+    private List<IRequest<?>> openRequests = List.of();
     private int lifeCount;
 
     public WindowWorkshopSelectRequest(
@@ -67,6 +68,7 @@ public class WindowWorkshopSelectRequest extends AbstractModuleWindow<WorkshopMo
     public void onOpened()
     {
         super.onOpened();
+        openRequests = getOpenRequests();
         updateRequests();
     }
 
@@ -149,10 +151,9 @@ public class WindowWorkshopSelectRequest extends AbstractModuleWindow<WorkshopMo
     private void select(@NotNull final Button button)
     {
         final int row = requestsList.getListElementIndexByPane(button);
-        final List<IRequest<?>> requests = getOpenRequests();
-        if (row >= 0 && row < requests.size())
+        if (row >= 0 && row < openRequests.size())
         {
-            reopenWithRequest.accept(requests.get(row));
+            reopenWithRequest.accept(openRequests.get(row));
         }
     }
 
@@ -160,24 +161,21 @@ public class WindowWorkshopSelectRequest extends AbstractModuleWindow<WorkshopMo
     {
         requestsList.setDataProvider(new ScrollingList.DataProvider()
         {
-            private List<IRequest<?>> requests = List.of();
-
             @Override
             public int getElementCount()
             {
-                requests = getOpenRequests();
-                return requests.size();
+                return openRequests.size();
             }
 
             @Override
             public void updateElement(final int index, @NotNull final Pane rowPane)
             {
-                if (index < 0 || index >= requests.size())
+                if (index < 0 || index >= openRequests.size())
                 {
                     return;
                 }
 
-                final IRequest<?> request = requests.get(index);
+                final IRequest<?> request = openRequests.get(index);
                 final ItemIcon stackIcon = rowPane.findPaneOfTypeByID(LIST_ELEMENT_ID_REQUEST_STACK, ItemIcon.class);
                 final Image logo = rowPane.findPaneOfTypeByID(DELIVERY_IMAGE, Image.class);
                 final List<ItemStack> displayStacks = request.getDisplayStacks();
