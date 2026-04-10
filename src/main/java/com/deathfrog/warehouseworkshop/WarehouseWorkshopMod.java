@@ -6,8 +6,6 @@ import com.deathfrog.warehouseworkshop.apiimp.initializer.BuildingsInitializer;
 import com.deathfrog.warehouseworkshop.core.network.NetworkHandler;
 import com.mojang.logging.LogUtils;
 
-import net.minecraft.world.food.FoodProperties;
-import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
@@ -17,7 +15,6 @@ import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
-import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
@@ -32,9 +29,6 @@ public class WarehouseWorkshopMod {
     // Create a Deferred Register to hold Items which will all be registered under the "warehouseworkshop" namespace
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
 
-    // Creates a new food item with the id "warehouseworkshop:example_id", nutrition 1 and saturation 2
-    public static final DeferredItem<Item> EXAMPLE_ITEM = ITEMS.registerSimpleItem("example_item", new Item.Properties().food(new FoodProperties.Builder()
-            .alwaysEdible().nutrition(1).saturationModifier(2f).build()));
 
     // The constructor for the mod class is the first code that is run when your mod is loaded.
     // FML will recognize some parameter types like IEventBus or ModContainer and pass them in automatically.

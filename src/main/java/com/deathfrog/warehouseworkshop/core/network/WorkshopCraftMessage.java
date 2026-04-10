@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import javax.annotation.Nonnull;
+
 import org.jetbrains.annotations.NotNull;
 
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
@@ -47,7 +49,10 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
     public static final int CRAFT_TYPE_CRAFTING = 0;
     public static final int CRAFT_TYPE_DOMUM = 1;
 
+    @SuppressWarnings("null")
     public static final Type<WorkshopCraftMessage> ID = new Type<>(ResourceLocation.fromNamespaceAndPath(WarehouseWorkshopMod.MODID, "workshop_craft"));
+    
+    @SuppressWarnings("null")
     public static final StreamCodec<RegistryFriendlyByteBuf, WorkshopCraftMessage> STREAM_CODEC = StreamCodec.composite(
         BlockPos.STREAM_CODEC,
         WorkshopCraftMessage::buildingPos,
@@ -73,6 +78,14 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         context.enqueueWork(() -> execute(player));
     }
 
+    /**
+     * Executes a validated workshop craft on the server.
+     * @param player The player performing the craft
+     * @param building The building that the player is currently viewing
+     * @param module The workshop module that is handling the craft
+     * @param normalizedGrid The normalized 3x3 crafting grid
+     */
+    @SuppressWarnings("null")
     private void execute(final Player player)
     {
         if (player == null || grid.size() != 9 || craftCount <= 0)
@@ -116,6 +129,14 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         executeCraftingGridCraft(player, building, module, normalizedGrid);
     }
 
+    /**
+     * Executes a validated grid-based craft on the server.
+     * @param player the player performing the craft
+     * @param building the building that the player is currently viewing
+     * @param module the workshop module that is handling the craft
+     * @param normalizedGrid the normalized 3x3 crafting grid
+     */
+    @SuppressWarnings("null")
     private void executeCraftingGridCraft(
         final Player player,
         final IBuilding building,
@@ -178,6 +199,14 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
     }
 
+    /**
+     * Executes a validated Domum craft on the server.
+     * @param player The player performing the craft
+     * @param building The building that the player is currently viewing
+     * @param module The workshop module that is handling the craft
+     * @param normalizedGrid The normalized 3x3 crafting grid
+     */
+    @SuppressWarnings("null")
     private void executeDomumCraft(
         final Player player,
         final IBuilding building,
@@ -291,6 +320,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return ingredients;
     }
 
+    @SuppressWarnings("null")
     private static ArchitectsCutterRecipeInput buildDomumInput(final List<ItemStack> ingredients)
     {
         final SimpleContainer container = new SimpleContainer(ingredients.size());
@@ -315,6 +345,16 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return copies;
     }
 
+    /**
+     * Checks if all the ingredients in the given list are available in the given item handlers.
+     * If includePlayerInventory is true, the player's inventory is also checked.
+     * 
+     * @param ingredients the list of ingredients to check
+     * @param warehouseInventory the item handler for the warehouse inventory
+     * @param playerInventory the item handler for the player inventory
+     * @param includePlayerInventory whether to include the player inventory in the check
+     * @return true if all ingredients are available, false otherwise
+     */
     private static boolean hasCraftingIngredients(
         final List<ItemStack> ingredients,
         final IItemHandler warehouseInventory,
@@ -329,7 +369,14 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         final Map<ItemStack, Integer> required = countRequiredIngredients(ingredients);
         for (final Map.Entry<ItemStack, Integer> entry : required.entrySet())
         {
-            final int available = countMatchingItems(warehouseInventory, entry.getKey()) + countMatchingItems(playerInventory, entry.getKey());
+            ItemStack key = entry.getKey();
+
+            if (key == null || key.isEmpty())
+            {
+                continue;
+            }
+
+            final int available = countMatchingItems(warehouseInventory, key) + countMatchingItems(playerInventory, key);
             if (available < entry.getValue())
             {
                 return false;
@@ -339,6 +386,16 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return true;
     }
 
+    /**
+     * Removes the given ingredients from the given item handlers.
+     * If includePlayerInventory is true, both the warehouse and player inventory are checked.
+     * 
+     * @param ingredients the list of ingredients to remove
+     * @param warehouseInventory the item handler for the warehouse inventory
+     * @param playerInventory the item handler for the player inventory
+     * @param includePlayerInventory whether to include the player inventory in the removal
+     * @return true if all ingredients were removed, false otherwise
+     */
     private static boolean removeIngredients(
         final List<ItemStack> ingredients,
         final IItemHandler warehouseInventory,
@@ -352,10 +409,17 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
 
         for (final Map.Entry<ItemStack, Integer> entry : countRequiredIngredients(ingredients).entrySet())
         {
-            int remaining = removeMatchingItems(warehouseInventory, entry.getKey(), entry.getValue());
+            ItemStack key = entry.getKey();
+
+            if (key == null || key.isEmpty())
+            {
+                continue;
+            }
+
+            int remaining = removeMatchingItems(warehouseInventory, key, entry.getValue());
             if (remaining > 0)
             {
-                remaining = removeMatchingItems(playerInventory, entry.getKey(), remaining);
+                remaining = removeMatchingItems(playerInventory, key, remaining);
             }
 
             if (remaining > 0)
@@ -367,6 +431,18 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return true;
     }
 
+    /**
+     * Counts the number of required ingredients for the given list of ingredients.
+     * 
+     * The method iterates over the given list of ingredients, and for each ingredient,
+     * it creates a new ItemStack with a count of 1 and merges it into the given map
+     * with the count of the original ingredient. If the map already contains the
+     * ingredient, the count is added to the existing value. Otherwise, the ingredient is
+     * added to the map with the given count.
+     * 
+     * @param ingredients the list of ingredients to count
+     * @return a map of ingredients to their required counts
+     */
     private static Map<ItemStack, Integer> countRequiredIngredients(final List<ItemStack> ingredients)
     {
         final Map<ItemStack, Integer> required = new HashMap<>();
@@ -385,11 +461,26 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return required;
     }
 
-    private static void mergeRequiredIngredient(final Map<ItemStack, Integer> required, final ItemStack ingredient, final int count)
+    /**
+     * Merges the given ingredient and count into the given map of required ingredients.
+     * If the map already contains the given ingredient, the count is added to the existing value.
+     * Otherwise, the ingredient is added to the map with the given count.
+     *
+     * @param required the map of required ingredients to merge into
+     * @param ingredient the ingredient to merge
+     * @param count the count of the ingredient to merge
+     */
+    private static void mergeRequiredIngredient(final Map<ItemStack, Integer> required, final @Nonnull ItemStack ingredient, final int count)
     {
         for (final Map.Entry<ItemStack, Integer> entry : required.entrySet())
         {
-            if (ItemStack.isSameItemSameComponents(entry.getKey(), ingredient))
+            ItemStack key = entry.getKey();
+            if (key == null)
+            {
+                continue;
+            }
+
+            if (ItemStack.isSameItemSameComponents(key, ingredient))
             {
                 entry.setValue(entry.getValue() + count);
                 return;
@@ -399,7 +490,16 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         required.put(ingredient.copy(), count);
     }
 
-    private static int countMatchingItems(final IItemHandler inventory, final ItemStack target)
+    /**
+     * Counts the number of matching items in the given inventory.
+     * The method iterates over all slots in the inventory and checks if the stack in the slot
+     * matches the given target item (ignoring damage value and NBT). If the stack matches, its count is added to the total count.
+     *
+     * @param inventory the inventory to count matching items in
+     * @param target the target item to count
+     * @return the total count of matching items in the inventory
+     */
+    private static int countMatchingItems(final IItemHandler inventory, final @Nonnull ItemStack target)
     {
         int count = 0;
         for (int slot = 0; slot < inventory.getSlots(); slot++)
@@ -414,7 +514,18 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return count;
     }
 
-    private static int removeMatchingItems(final IItemHandler inventory, final ItemStack target, final int count)
+    /**
+     * Removes matching items from the given inventory.
+     * The method iterates over all slots in the inventory and checks if the stack in the slot
+     * matches the given target item (ignoring damage value and NBT). If the stack matches, it is removed
+     * from the inventory up to the given count.
+     *
+     * @param inventory the inventory to remove matching items from
+     * @param target the target item to remove
+     * @param count the maximum number of items to remove
+     * @return the number of items remaining after the removal
+     */
+    private static int removeMatchingItems(final IItemHandler inventory, final @Nonnull ItemStack target, final int count)
     {
         int remaining = count;
         for (int slot = 0; slot < inventory.getSlots() && remaining > 0; slot++)
@@ -452,7 +563,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         }
     }
 
-    private static void giveCraftingOutput(final Player player, final IItemHandler warehouseInventory, final ItemStack stack, final OutputTarget outputTarget)
+    private static void giveCraftingOutput(final Player player, final @Nonnull IItemHandler warehouseInventory, final ItemStack stack, final OutputTarget outputTarget)
     {
         if (outputTarget.isWarehouse())
         {
@@ -463,7 +574,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         giveToPlayer(player, stack);
     }
 
-    private static void giveToWarehouse(final Player player, final IItemHandler warehouseInventory, final ItemStack stack)
+    private static void giveToWarehouse(final Player player, final @Nonnull IItemHandler warehouseInventory, final ItemStack stack)
     {
         if (stack.isEmpty())
         {

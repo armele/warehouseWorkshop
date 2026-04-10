@@ -3,6 +3,8 @@ package com.deathfrog.warehouseworkshop.core.compatibility.jei;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.annotation.Nonnull;
+
 import org.jetbrains.annotations.NotNull;
 
 import com.deathfrog.warehouseworkshop.core.client.gui.modules.WindowWorkshopModule;
@@ -26,8 +28,21 @@ public class WorkshopGhostIngredientHandler implements IGhostIngredientHandler<B
     private static final int REQUEST_PREVIEW_X = 113;
     private static final int REQUEST_PREVIEW_Y = 56;
 
+    /**
+     * Retrieves a list of ghost ingredient targets for the given BO screen.
+     * <p>
+     * The targets are used to determine where the player can drop ingredients when using JEI.
+     * <p>
+     * The targets are currently limited to the workshop window's slots, and a preview slot used to select the output.
+     * <p>
+     * The doStart parameter is currently unused.
+     * @param gui The BO screen to get the targets for.
+     * @param ingredient The ingredient to get the targets for.
+     * @param doStart Whether to start the ingredient handler.
+     * @return A list of ghost ingredient targets.
+     */
     @Override
-    public <I> List<Target<I>> getTargetsTyped(@NotNull final BOScreen gui, @NotNull final ITypedIngredient<I> ingredient, final boolean doStart)
+    public <I> List<Target<I>> getTargetsTyped(final @Nonnull BOScreen gui, @Nonnull final ITypedIngredient<I> ingredient, final boolean doStart)
     {
         final WindowWorkshopModule workshopWindow = getWorkshopWindow(gui);
         if (workshopWindow == null || ingredient.getType().getIngredientClass() != ItemStack.class)

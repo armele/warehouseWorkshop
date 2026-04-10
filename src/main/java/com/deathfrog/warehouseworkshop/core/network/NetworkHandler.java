@@ -15,6 +15,7 @@ public final class NetworkHandler
     {
     }
 
+    @SuppressWarnings("null")
     public static void register(final RegisterPayloadHandlersEvent event)
     {
         final String modVersion = ModList.get().getModContainerById(WarehouseWorkshopMod.MODID).get().getModInfo().getVersion().toString();

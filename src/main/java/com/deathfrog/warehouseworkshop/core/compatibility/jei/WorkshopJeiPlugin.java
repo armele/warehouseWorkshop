@@ -1,5 +1,7 @@
 package com.deathfrog.warehouseworkshop.core.compatibility.jei;
 
+import javax.annotation.Nonnull;
+
 import org.jetbrains.annotations.NotNull;
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.core.client.gui.modules.WindowWorkshopModule;
@@ -19,7 +21,7 @@ import net.neoforged.neoforge.common.NeoForge;
 @mezz.jei.api.JeiPlugin
 public class WorkshopJeiPlugin implements IModPlugin
 {
-    private final WorkshopGhostIngredientHandler ghostIngredientHandler = new WorkshopGhostIngredientHandler();
+    private final @Nonnull WorkshopGhostIngredientHandler ghostIngredientHandler = new WorkshopGhostIngredientHandler();
     private IJeiRuntime jeiRuntime;
     private boolean registeredMouseHandler = false;
 
@@ -39,7 +41,7 @@ public class WorkshopJeiPlugin implements IModPlugin
      * The handler is also used to register a ghost ingredient handler, which is used to display the currently selected ingredient in the workshop window.
      */
     @Override
-    public void registerGuiHandlers(@NotNull final IGuiHandlerRegistration registration)
+    public void registerGuiHandlers(@Nonnull final IGuiHandlerRegistration registration)
     {
         registration.addGuiScreenHandler(BOScreen.class, gui ->
         {
@@ -102,7 +104,7 @@ public class WorkshopJeiPlugin implements IModPlugin
     }
 
     @Override
-    public void onRuntimeAvailable(@NotNull final IJeiRuntime jeiRuntime)
+    public void onRuntimeAvailable(@Nonnull final IJeiRuntime jeiRuntime)
     {
         this.jeiRuntime = jeiRuntime;
         if (!this.registeredMouseHandler)

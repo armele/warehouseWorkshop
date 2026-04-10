@@ -3,6 +3,8 @@ package com.deathfrog.warehouseworkshop.core.network;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.annotation.Nonnull;
+
 import org.jetbrains.annotations.NotNull;
 
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
@@ -24,7 +26,10 @@ import net.neoforged.neoforge.items.IItemHandler;
  */
 public record ClientboundWorkshopCraftedMessage(BlockPos buildingPos, List<ItemStack> warehouseStock, List<ItemStack> playerStock) implements CustomPacketPayload
 {
+    @SuppressWarnings("null")
     public static final Type<ClientboundWorkshopCraftedMessage> ID = new Type<>(ResourceLocation.fromNamespaceAndPath(WarehouseWorkshopMod.MODID, "workshop_crafted"));
+    
+    @SuppressWarnings("null")
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientboundWorkshopCraftedMessage> STREAM_CODEC = StreamCodec.composite(
         BlockPos.STREAM_CODEC,
         ClientboundWorkshopCraftedMessage::buildingPos,
@@ -41,7 +46,7 @@ public record ClientboundWorkshopCraftedMessage(BlockPos buildingPos, List<ItemS
     }
 
     public static void sendToPlayer(
-        final ServerPlayer player,
+        final @Nonnull ServerPlayer player,
         final BlockPos buildingPos,
         final IItemHandler warehouseInventory,
         final IItemHandler playerInventory)
@@ -72,10 +77,12 @@ public record ClientboundWorkshopCraftedMessage(BlockPos buildingPos, List<ItemS
         return stock;
     }
 
-    private static void mergeStack(final List<ItemStack> stock, final ItemStack stack)
+    private static void mergeStack(final List<ItemStack> stock, final @Nonnull ItemStack stack)
     {
         for (final ItemStack existing : stock)
         {
+            if (existing == null) continue;
+
             if (ItemStack.isSameItemSameComponents(existing, stack))
             {
                 existing.setCount(existing.getCount() + stack.getCount());

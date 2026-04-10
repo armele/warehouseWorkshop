@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import javax.annotation.Nonnull;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -43,6 +45,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
@@ -181,6 +184,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         @Nullable RecipeHolder<CraftingRecipe> craftingRecipe,
         @Nullable RecipeHolder<ArchitectsCutterRecipe> domumRecipe)
     {
+        @SuppressWarnings("null")
         static WorkshopRecipe crafting(final RecipeHolder<CraftingRecipe> recipe, final Level level)
         {
             return new WorkshopRecipe(
@@ -548,6 +552,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             craftCount));
     }
 
+    /**
+     * Updates the crafting contents of the workshop window with the given snapshots of the warehouse and player inventory.
+     * This method is only effective if the given building position matches the current position of the workshop window.
+     * If the positions do not match, this method does nothing.
+     * @param buildingPos The position of the building that the workshop window is currently viewing.
+     * @param warehouseStockSnapshot The snapshot of the warehouse inventory.
+     * @param playerStockSnapshot The snapshot of the player inventory.
+     */
     public void refreshCraftingContents(
         final BlockPos buildingPos,
         final List<ItemStack> warehouseStockSnapshot,
@@ -563,6 +575,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         applySelectedRecipe();
     }
 
+    /**
+     * Applies a snapshot of the warehouse and player stock to the current stock.
+     * This will clear the current stock and replace it with the items from the snapshot.
+     * The count of each item in the snapshot will be added to the count of the same item in the stock.
+     * If an item is not present in the snapshot, it will be removed from the stock.
+     * @param stock the map of items to their counts in the stock
+     * @param snapshot the list of items to be applied to the stock
+     */
+    @SuppressWarnings("null")
     private void applyStockSnapshot(final Map<ItemStorage, Integer> stock, final List<ItemStack> snapshot)
     {
         stock.clear();
@@ -575,6 +596,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
     }
 
+    /**
+     * Calculates the maximum number of crafts that can be performed using the currently active recipe and current stock levels.
+     * The calculation takes into account the number of crafts requested by the player, the number of crafts supported by the recipe,
+     * and the number of crafts that can be supported by the current stock levels.
+     * 
+     * @return The maximum number of crafts that can be performed.
+     */
     private int getCraftAllCount()
     {
         final WorkshopRecipe selectedRecipe = getActiveRecipe();
@@ -592,6 +620,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         final ItemStack recipeOutput = getCurrentGridOutput();
         final int requestedCrafts = getRequestedCraftCount(recipeOutput);
         final int supportedCrafts = getSupportedCraftCount();
+
         if (requestedCrafts <= 0)
         {
             return supportedCrafts;
@@ -636,6 +665,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return requestedOutputCount;
     }
 
+    /**
+     * Calculates the maximum number of crafts that can be performed using the currently active recipe and current stock levels.
+     * The calculation takes into account the number of crafts supported by the recipe, and the number of crafts that can be
+     * supported by the current stock levels.
+     * 
+     * @return The maximum number of crafts that can be performed.
+     */
+    @SuppressWarnings("null")
     private int getSupportedCraftCount()
     {
         final Map<ItemStorage, Integer> requiredPerCraft = new HashMap<>();
@@ -666,6 +703,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return getActiveRecipe() != null && !getCurrentGridOutput().isEmpty() && hasCraftingContents(List.copyOf(selectedGrid));
     }
 
+    /**
+     * Retrieves the recipe associated with the currently selected grid items, or null if there is no valid recipe.
+     * 
+     * @return The recipe associated with the currently selected grid items, or null if there is no valid recipe.
+     */
+    @SuppressWarnings("null")
     private @Nullable RecipeHolder<CraftingRecipe> getCurrentGridRecipe()
     {
         final Level level = Minecraft.getInstance().level;
@@ -675,9 +718,24 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         final CraftingInput input = CraftingInput.of(3, 3, List.copyOf(selectedGrid));
+
+        if (input == null || input.isEmpty())
+        {
+            return null;
+        }
+
         return level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, input, level).orElse(null);
     }
 
+    /**
+     * Retrieves the output item stack associated with the currently selected grid items, using the currently selected recipe.
+     * If the currently selected recipe is a DOMUM recipe, then the output is determined by assembling the DOMUM output based on the currently selected grid items.
+     * If the currently selected recipe is a CRAFTING recipe, then the output is determined by retrieving the output item stack associated with the currently selected grid items using the currently selected recipe.
+     * If there is no valid recipe associated with the currently selected grid items, then the output is an empty item stack.
+     * 
+     * @return The output item stack associated with the currently selected grid items, or an empty item stack if there is no valid recipe associated with the currently selected grid items.
+     */
+    @SuppressWarnings("null")
     private ItemStack getCurrentGridOutput()
     {
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
@@ -696,6 +754,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return currentRecipe.value().getResultItem(level.registryAccess()).copy();
     }
 
+    /**
+     * Determines whether the currently selected grid items match the selected request or JEI search output.
+     * 
+     * @return true if the currently selected grid items match the selected request or JEI search output, false otherwise.
+     */
     private boolean doesCurrentGridMatchRequest()
     {
         final ItemStack gridOutput = getCurrentGridOutput();
@@ -713,6 +776,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             || ItemStackUtils.compareItemStacksIgnoreStackSize(gridOutput, jeiSearchOutput, false, true);
     }
 
+    /**
+     * Retrieves a preview of the output item stack associated with the currently selected request.
+     * If the currently selected request is a recipe, then the output is determined by retrieving the output item stack associated with the currently selected recipe, and then setting the count of the output item stack to the requested output count.
+     * If the currently selected request is not a recipe, then the output is determined by retrieving the first output item stack associated with the currently selected request.
+     * If there is no valid request associated with the currently selected request, then the output is an empty item stack.
+     * 
+     * @return A preview of the output item stack associated with the currently selected request, or an empty item stack if there is no valid request associated with the currently selected request.
+     */
     private ItemStack getRequestPreviewOutput()
     {
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
@@ -735,6 +806,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return requestOutputs.get(0).copy();
     }
 
+    /**
+     * Refreshes the warehouse stock by iterating over all container blocks and merging their contents into the warehouse stock.
+     * This is called when the player opens the workshop window, and when the player closes the workshop window.
+     */
+    @SuppressWarnings("null")
     private void refreshWarehouseStock()
     {
         warehouseStock.clear();
@@ -750,6 +826,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         for (final BlockPos pos : containers)
         {
+            if (pos == null)
+            {
+                continue;
+            }
+
             final BlockEntity entity = level.getBlockEntity(pos);
             if (entity instanceof final TileEntityRack rack)
             {
@@ -758,6 +839,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
     }
 
+    /**
+     * Refreshes the player's inventory stock by iterating over all items in the player's inventory and merging their contents into the player stock.
+     * This is called when the player opens the workshop window, and when the player closes the workshop window.
+     */
+    @SuppressWarnings("null")
     private void refreshPlayerInventoryStock()
     {
         playerStock.clear();
@@ -777,6 +863,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
     }
 
+    /**
+     * Finds all recipes that match the given requested outputs. If requireWarehouseContents is true, then only recipes that can be crafted with the items in the warehouse will be returned.
+     * 
+     * @param requestedOutputs the list of requested output item stacks
+     * @param requireWarehouseContents whether to only return recipes that can be crafted with the items in the warehouse
+     * @return a list of matching recipes, sorted by their hover name and then by their kind and ID
+     */
+    @SuppressWarnings("null")
     private List<WorkshopRecipe> findMatchingRecipes(final List<ItemStack> requestedOutputs, final boolean requireWarehouseContents)
     {
         final Level level = Minecraft.getInstance().level;
@@ -1022,6 +1116,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matches;
     }
 
+    /**
+     * Gets a display stack from an ingredient, used for displaying the ingredient in the JEI GUI.
+     * The display stack is a copy of the first non-empty stack in the ingredient's items list, with its count set to 1.
+     * If the ingredient has no non-empty stacks, an empty ItemStack is returned.
+     *
+     * @param ingredient the ingredient to get a display stack for
+     * @return a display stack for the ingredient
+     */
     private ItemStack getIngredientDisplayStack(final Ingredient ingredient)
     {
         for (final ItemStack stack : ingredient.getItems())
@@ -1037,9 +1139,25 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return ItemStack.EMPTY;
     }
 
+    /**
+     * Gets a display stack for a domum slot requirement.
+     * If the requirement's material is null, an empty stack is returned.
+     * Otherwise, a stack with the material and count 1 is returned.
+     *
+     * @param requirement the requirement to get the display stack for
+     * @return the display stack
+     */
     private ItemStack getDomumRequirementDisplayStack(final DomumSlotRequirement requirement)
     {
-        final ItemStack displayStack = new ItemStack(requirement.material());
+        final Block material = requirement.material();
+
+        if (material == null)
+        {
+            return ItemStack.EMPTY;
+        }
+
+        final ItemStack displayStack = new ItemStack(material);
+        
         if (!displayStack.isEmpty())
         {
             displayStack.setCount(1);
@@ -1047,9 +1165,28 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return displayStack;
     }
 
+    /**
+     * Builds an output stack for a domum recipe based on the given requested output stack.
+     * The output stack is a copy of the requested stack with the count set to the maximum of the component count and the recipe count.
+     * If the requested stack is empty or does not match the domum recipe's result, an empty stack is returned.
+     * If the domum recipe has no components or more than two components, an empty stack is returned.
+     * Otherwise, the output stack is updated with the default textures of the components and returned.
+     * 
+     * @param recipe the domum recipe to build the output stack for
+     * @param requested the requested output stack
+     * @param level the level to access the recipe's result
+     * @return the built output stack
+     */
     private ItemStack buildDomumOutputForRequest(final ArchitectsCutterRecipe recipe, final ItemStack requested, final Level level)
     {
-        if (requested.isEmpty() || !matchesDomumRecipeResult(recipe.getResultItem(level.registryAccess()), requested))
+        ItemStack recipeResult = recipe.getResultItem(level.registryAccess());
+
+        if (recipeResult == null || recipeResult.isEmpty())
+        {
+            return ItemStack.EMPTY;
+        }
+
+        if (requested.isEmpty() || !matchesDomumRecipeResult(recipeResult, requested))
         {
             return ItemStack.EMPTY;
         }
@@ -1075,7 +1212,16 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return output;
     }
 
-    private boolean matchesDomumRecipeResult(final ItemStack recipeResult, final ItemStack requested)
+    /**
+     * Checks if the given recipe result matches the given requested output stack.
+     * The stacks are considered to match if they have the same item and block state.
+     * If either of the stacks has no block state, the stacks are considered to match.
+     * @param recipeResult the recipe result to check
+     * @param requested the requested output stack to check against
+     * @return true if the stacks match, false otherwise
+     */
+    @SuppressWarnings("null")
+    private boolean matchesDomumRecipeResult(final @Nonnull ItemStack recipeResult, final @Nonnull ItemStack requested)
     {
         if (!ItemStack.isSameItem(recipeResult, requested))
         {
@@ -1106,10 +1252,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         for (final IMateriallyTexturedBlockComponent component : components)
         {
             final Block material = materials.getOrDefault(component.getId(), component.getDefault());
-            if (!material.defaultBlockState().is(component.getValidSkins()))
+            TagKey<Block> validSkins = component.getValidSkins();
+
+            if (validSkins == null) continue;
+
+            if (!material.defaultBlockState().is(validSkins))
             {
                 return List.of();
             }
+            
             requirements.add(new DomumSlotRequirement(material));
         }
 
@@ -1126,6 +1277,18 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return new ArrayList<>(texturedBlock.getComponents());
     }
 
+    /**
+     * Assembles a domum output stack from the given recipe.
+     * The assembled stack is a copy of the recipe's output stack with the count set to the maximum of the component count and the recipe count.
+     * If the recipe has no components, an empty stack is returned.
+     * If the domum recipe has no components or more than two components, an empty stack is returned.
+     * If the selected grid does not contain the required components, an empty stack is returned.
+     * Otherwise, the output stack is updated with the default textures of the components and returned.
+     * 
+     * @param recipe the domum recipe to assemble the output stack for
+     * @return the assembled output stack
+     */
+    @SuppressWarnings("null")
     private ItemStack assembleDomumOutput(final WorkshopRecipe recipe)
     {
         if (recipe.domumRecipe() == null)
@@ -1218,6 +1381,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return outputs;
     }
 
+    /**
+     * Checks if the given stacks contain enough items to fulfill the crafting request.
+     * The method will return false if any of the required items are not present in the stacks, or if the count of the required items is less than the requested count.
+     * 
+     * @param stacks the list of stacks to check
+     * @return true if the given stacks contain enough items, false otherwise
+     */
+    @SuppressWarnings("null")
     private boolean hasCraftingContents(final List<ItemStack> stacks)
     {
         final Map<ItemStorage, Integer> required = new HashMap<>();

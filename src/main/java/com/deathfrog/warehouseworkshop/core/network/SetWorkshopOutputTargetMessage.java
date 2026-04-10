@@ -21,7 +21,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record SetWorkshopOutputTargetMessage(BlockPos buildingPos, int outputTargetId) implements IServerboundPayload
 {
+    @SuppressWarnings("null")
     public static final Type<SetWorkshopOutputTargetMessage> ID = new Type<>(ResourceLocation.fromNamespaceAndPath(WarehouseWorkshopMod.MODID, "set_workshop_output_target"));
+    
+    @SuppressWarnings("null")
     public static final StreamCodec<RegistryFriendlyByteBuf, SetWorkshopOutputTargetMessage> STREAM_CODEC = StreamCodec.composite(
         BlockPos.STREAM_CODEC,
         SetWorkshopOutputTargetMessage::buildingPos,

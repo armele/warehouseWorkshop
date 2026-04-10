@@ -20,7 +20,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record SetWorkshopIncludePlayerInventoryMessage(BlockPos buildingPos, boolean includePlayerInventory) implements IServerboundPayload
 {
+    @SuppressWarnings("null")
     public static final Type<SetWorkshopIncludePlayerInventoryMessage> ID = new Type<>(ResourceLocation.fromNamespaceAndPath(WarehouseWorkshopMod.MODID, "set_workshop_include_player_inventory"));
+    
+    @SuppressWarnings("null")
     public static final StreamCodec<RegistryFriendlyByteBuf, SetWorkshopIncludePlayerInventoryMessage> STREAM_CODEC = StreamCodec.composite(
         BlockPos.STREAM_CODEC,
         SetWorkshopIncludePlayerInventoryMessage::buildingPos,
