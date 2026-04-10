@@ -25,6 +25,7 @@ import com.ldtteam.blockui.controls.Button;
 import com.ldtteam.blockui.controls.Gradient;
 import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
+import com.ldtteam.blockui.controls.TextField;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlock;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlockComponent;
 import com.ldtteam.domumornamentum.client.model.data.MaterialTextureData;
@@ -79,6 +80,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private static final int MISSING_SLOT_RED = 180;
     private static final int MISSING_SLOT_GREEN = 48;
     private static final int MISSING_SLOT_BLUE = 48;
+    private static final String DEFAULT_CRAFT_AMOUNT = "1";
 
     private final List<Gradient> gridBackgrounds = new ArrayList<>(GRID_SIZE);
     private final List<ItemIcon> gridIcons = new ArrayList<>(GRID_SIZE);
@@ -98,6 +100,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private final Button craftAllButton;
     private final Button outputTargetButton;
     private final Button includePlayerInventoryButton;
+    private final TextField craftAmountInput;
 
     private final Map<ItemStorage, Integer> warehouseStock = new HashMap<>();
     private final Map<ItemStorage, Integer> playerStock = new HashMap<>();
@@ -132,6 +135,24 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         this.craftAllButton = window.findPaneOfTypeByID("craftAll", Button.class);
         this.outputTargetButton = window.findPaneOfTypeByID("outputTarget", Button.class);
         this.includePlayerInventoryButton = window.findPaneOfTypeByID("includePlayerInventory", Button.class);
+        this.craftAmountInput = window.findPaneOfTypeByID("craftAmount", TextField.class);
+        this.craftAmountInput.setFilter(new TextField.Filter()
+        {
+            @Override
+            public String filter(final String input)
+            {
+                return sanitizeCraftAmountText(input);
+            }
+
+            @Override
+            public boolean isAllowedCharacter(final char c)
+            {
+                return Character.isDigit(c);
+            }
+        });
+        this.craftAmountInput.setMaxTextLength(9);
+        this.craftAmountInput.setHandler(input -> updateCraftButtons());
+        this.craftAmountInput.setText(DEFAULT_CRAFT_AMOUNT);
 
         registerButton("request", this::showRequests);
         registerButton("clear", this::clearGrid);
@@ -282,6 +303,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         refreshPlayerInventoryStock();
         this.matchingRecipes.addAll(findMatchingRecipes(this.requestOutputs, false));
         this.selectedRecipeIndex = this.matchingRecipes.isEmpty() ? -1 : 0;
+        populateCraftAmountFromRequest();
         applySelectedRecipe();
     }
 
@@ -481,7 +503,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         if (slotStates.get(slot) == SlotState.MISSING)
         {
+            final int clickThroughAmount = getClickThroughCraftAmount(slot);
             selectJeiOutput(displayGrid.get(slot));
+            if (clickThroughAmount > 0)
+            {
+                craftAmountInput.setText(Integer.toString(clickThroughAmount));
+            }
             return;
         }
 
@@ -516,7 +543,9 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         final int craftCount = getCraftAllCount();
         if (craftCount <= 0)
         {
-            setStatusText(getMissingStatusText());
+            setStatusText(hasValidCraftAmount()
+                ? getMissingStatusText()
+                : Component.translatable("com.warehouseworkshop.core.gui.workshop.status.invalid_count"));
             return;
         }
 
@@ -618,21 +647,28 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         final ItemStack recipeOutput = getCurrentGridOutput();
-        final int requestedCrafts = getRequestedCraftCount(recipeOutput);
-        final int supportedCrafts = getSupportedCraftCount(requestedCrafts);
-
-        if (requestedCrafts <= 0)
+        final int requestedOutputCount = getCraftAmount();
+        if (requestedOutputCount <= 0)
         {
-            return supportedCrafts;
+            return 0;
         }
 
-        return Math.min(requestedCrafts, supportedCrafts);
+        final int requestedCrafts = getRequestedCraftCount(recipeOutput, requestedOutputCount);
+        final int supportedCrafts = getSupportedCraftCount(requestedCrafts);
+        return requestedCrafts <= 0 ? 0 : Math.min(requestedCrafts, supportedCrafts);
     }
 
-    private int getRequestedCraftCount(final ItemStack recipeOutput)
+    /**
+     * Calculates the number of crafts that need to be performed on the currently selected recipe in order to fulfill the given requested output count.
+     * The calculation takes into account the number of outputs per craft of the currently selected recipe.
+     * If the currently selected recipe is invalid, or the requested output count is 0 or less, 0 is returned.
+     * @param recipeOutput the output item stack of the currently selected recipe
+     * @param requestedOutputCount the number of outputs requested by the player
+     * @return the number of crafts that need to be performed on the currently selected recipe in order to fulfill the given requested output count
+     */
+    private int getRequestedCraftCount(final ItemStack recipeOutput, final int requestedOutputCount)
     {
-        final int requestedOutputCount = getRequestedOutputCount(recipeOutput);
-        if (requestedOutputCount <= 0)
+        if (recipeOutput.isEmpty() || requestedOutputCount <= 0)
         {
             return 0;
         }
@@ -641,6 +677,70 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return (requestedOutputCount + outputPerCraft - 1) / outputPerCraft;
     }
 
+    /**
+     * Calculates the number of crafts that need to be performed on the currently selected recipe in order to fulfill the click-through on the given slot.
+     * The calculation takes into account the number of required ingredients for the click-through, and the number of outputs per craft of the currently selected recipe.
+     * If the currently selected recipe is invalid, or the required ingredient count is 0 or less, 0 is returned.
+     * 
+     * @param slot the slot to calculate the click-through craft amount for
+     * @return the number of crafts that need to be performed on the currently selected recipe in order to fulfill the click-through on the given slot
+     */
+    private int getClickThroughCraftAmount(final int slot)
+    {
+        final int requiredIngredientCount = getRequiredIngredientCountForClickThrough(slot);
+        if (requiredIngredientCount <= 0)
+        {
+            return 0;
+        }
+
+        final WorkshopRecipe childRecipe = getSelectedRecipe();
+        if (childRecipe == null)
+        {
+            return requiredIngredientCount;
+        }
+
+        final int outputPerCraft = Math.max(1, childRecipe.output().getCount());
+        return (requiredIngredientCount + outputPerCraft - 1) / outputPerCraft;
+    }
+
+    /**
+     * Calculates the total number of ingredients required to fulfill the given slot for the given parent craft.
+     * If the parent craft is invalid, or the slot is not applicable to the parent craft, 0 is returned.
+     * 
+     * @param slot the slot to calculate the required ingredient count for
+     * @return the total number of ingredients required to fulfill the given slot for the given parent craft
+     */
+    private int getRequiredIngredientCountForClickThrough(final int slot)
+    {
+        final WorkshopRecipe selectedRecipe = getSelectedRecipe();
+        if (selectedRecipe == null)
+        {
+            return 0;
+        }
+
+        final ItemStack currentOutput = selectedRecipe.output().copy();
+        final int parentOutputAmount = getCraftAmount();
+        final int parentCraftCount = getRequestedCraftCount(currentOutput, parentOutputAmount);
+        if (parentCraftCount <= 0)
+        {
+            return 0;
+        }
+
+        final int ingredientCountPerCraft = getIngredientCountPerCraft(selectedRecipe, slot);
+        if (ingredientCountPerCraft <= 0)
+        {
+            return 0;
+        }
+
+        return ingredientCountPerCraft * parentCraftCount;
+    }
+
+    /**
+     * Returns the total number of items requested in the currently selected request that matches the given recipe output.
+     * If the recipe output is empty, or there are no matching requested items, 0 is returned.
+     * @param recipeOutput the recipe output to check against the currently selected request
+     * @return the total number of items requested in the currently selected request that matches the given recipe output
+     */
     private int getRequestedOutputCount(final ItemStack recipeOutput)
     {
         if (recipeOutput.isEmpty())
@@ -740,6 +840,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return supportedCrafts;
     }
 
+    /**
+     * Calculates the maximum number of crafts that can be performed using the given required ingredients and current stock levels.
+     * The calculation takes into account the number of crafts supported by the recipe, and the number of crafts that can be
+     * supported by the current stock levels.
+     * 
+     * @param requiredPerCraft the map of required ingredients to their counts per craft
+     * @return The maximum number of crafts that can be performed.
+     */
     private int getBasicSupportedCraftCount(final Map<ItemStorage, Integer> requiredPerCraft)
     {
         int supportedCrafts = Integer.MAX_VALUE;
@@ -751,6 +859,17 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return supportedCrafts == Integer.MAX_VALUE ? 0 : supportedCrafts;
     }
 
+    /**
+     * Checks if all the ingredients in the given map are available in the given stocks.
+     * The check takes into account the number of crafts requested by the player, the number of crafts supported by the recipe,
+     * and the number of crafts that can be supported by the current stock levels.
+     * 
+     * @param requiredPerCraft the map of required ingredients to their counts per craft
+     * @param remainingWarehouseStock the map of items to their counts in the remaining warehouse stock
+     * @param remainingPlayerStock the map of items to their counts in the remaining player stock
+     * @param includePlayerInventory whether the count of each ingredient in the remaining player stock should be included
+     * @return true if all ingredients are available, false otherwise
+     */
     private boolean canConsumeIngredients(
         final Map<ItemStorage, Integer> requiredPerCraft,
         final Map<ItemStorage, Integer> remainingWarehouseStock,
@@ -769,6 +888,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return true;
     }
 
+    /**
+     * Consumes the given amount of ingredients from the given stock maps.
+     * If includePlayerInventory is true, both the warehouse and player inventory are checked.
+     * 
+     * @param requiredPerCraft the map of required ingredients to their counts per craft
+     * @param remainingWarehouseStock the map of items to their counts in the remaining warehouse stock
+     * @param remainingPlayerStock the map of items to their counts in the remaining player stock
+     * @param includePlayerInventory whether to include the player inventory in the consumption
+     */
     private void consumeIngredients(
         final Map<ItemStorage, Integer> requiredPerCraft,
         final Map<ItemStorage, Integer> remainingWarehouseStock,
@@ -1186,6 +1314,59 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matches;
     }
 
+    private int getIngredientCountPerCraft(final WorkshopRecipe recipe, final int slot)
+    {
+        if (recipe.kind() == RecipeKind.DOMUM)
+        {
+            final List<DomumSlotRequirement> requirements = getDomumRequirements(recipe);
+            final int componentIndex = slot == DOMUM_FIRST_SLOT ? 0 : slot == DOMUM_SECOND_SLOT ? 1 : -1;
+            if (componentIndex < 0 || componentIndex >= requirements.size())
+            {
+                return 0;
+            }
+
+            final Block targetMaterial = requirements.get(componentIndex).material();
+            int matches = 0;
+            for (final DomumSlotRequirement requirement : requirements)
+            {
+                if (requirement.material() == targetMaterial)
+                {
+                    matches++;
+                }
+            }
+
+            return matches;
+        }
+
+        if (recipe.craftingRecipe() == null)
+        {
+            return 0;
+        }
+
+        final List<Ingredient> slottedIngredients = buildSlottedIngredients(recipe.craftingRecipe().value());
+        if (slot < 0 || slot >= slottedIngredients.size())
+        {
+            return 0;
+        }
+
+        final ItemStack targetDisplayStack = getIngredientDisplayStack(slottedIngredients.get(slot));
+        if (targetDisplayStack.isEmpty())
+        {
+            return 0;
+        }
+
+        int matches = 0;
+        for (final Ingredient ingredient : slottedIngredients)
+        {
+            if (ItemStackUtils.compareItemStacksIgnoreStackSize(targetDisplayStack, getIngredientDisplayStack(ingredient), false, true))
+            {
+                matches++;
+            }
+        }
+
+        return matches;
+    }
+
     private record DomumSlotRequirement(Block material)
     {
     }
@@ -1406,6 +1587,21 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return recipeState.isEmpty() && requestedState.isEmpty() || recipeState.equals(requestedState);
     }
 
+    /**
+     * Retrieves the list of domum slot requirements for the given workshop recipe.
+     * 
+     * If the recipe has no domum recipe, an empty list is returned.
+     * If the recipe has no components, an empty list is returned.
+     * If the recipe has more than two components, an empty list is returned.
+     * 
+     * The list of requirements is generated by iterating over the components and
+     * retrieving the material and valid skins for each component. If the material
+     * does not have a valid block state in the given skins, the list is immediately
+     * returned as empty.
+     * 
+     * @param recipe the workshop recipe to retrieve the requirements for
+     * @return the list of domum slot requirements for the given recipe
+     */
     private List<DomumSlotRequirement> getDomumRequirements(final WorkshopRecipe recipe)
     {
         if (recipe.domumRecipe() == null)
@@ -1440,6 +1636,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return requirements;
     }
 
+    /**
+     * Retrieves the list of components for the given domum recipe.
+     * 
+     * If the given recipe's block is not an instance of IMateriallyTexturedBlock, an empty list is returned.
+     * 
+     * @param recipe the domum recipe to retrieve the components for
+     * @return the list of components for the given domum recipe
+     */
     private List<IMateriallyTexturedBlockComponent> getDomumComponents(final ArchitectsCutterRecipe recipe)
     {
         if (!(recipe.getBlock() instanceof final IMateriallyTexturedBlock texturedBlock))
@@ -1501,11 +1705,28 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return recipe.domumRecipe().value().assemble(recipeInput, level.registryAccess()).copy();
     }
 
+    /**
+     * Maps a component index (0 or 1) to a grid slot (DOMUM_FIRST_SLOT or DOMUM_SECOND_SLOT)
+     * for a Domum recipe.
+     *
+     * @param component the component index (0 or 1)
+     * @return the corresponding grid slot (DOMUM_FIRST_SLOT or DOMUM_SECOND_SLOT)
+     */
     private int domumGridSlot(final int component)
     {
         return component == 0 ? DOMUM_FIRST_SLOT : DOMUM_SECOND_SLOT;
     }
 
+    /**
+     * Extracts the requested outputs from the given request.
+     * 
+     * If the request's concrete deliverable has requested items, these items are added to the output list.
+     * If the request's concrete deliverable is an instance of IDeliverable and has a count greater than 0, the count of the first requested item is set to the count.
+     * If the request has display stacks, these stacks are added to the output list.
+     * 
+     * @param request the request to extract the requested outputs from
+     * @return the list of requested outputs
+     */
     private List<ItemStack> extractRequestedOutputs(final IRequest<?> request)
     {
         if (request.getRequest() instanceof final IConcreteDeliverable concreteDeliverable)
@@ -1614,6 +1835,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matchingRecipes.get(selectedRecipeIndex);
     }
 
+    /**
+     * Gets the currently active recipe.
+     * 
+     * If the currently selected recipe is a DOMUM recipe, it is returned directly.
+     * If the currently selected recipe is null or not a DOMUM recipe, the method attempts to get the current crafting recipe from the crafting grid.
+     * If the crafting recipe is null, the selected recipe is returned. Otherwise, the crafting recipe is converted to a WorkshopRecipe and returned.
+     * 
+     * @return the currently active recipe, or null if no recipe is active.
+     */
     private @Nullable WorkshopRecipe getActiveRecipe()
     {
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
@@ -1633,6 +1863,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         this.requestOutputs.clear();
     }
 
+    /**
+     * Clears the current JEI selection and optionally clears the crafting grid.
+     *
+     * @param clearGrid whether or not to clear the crafting grid
+     */
     private void clearJeiSelection(final boolean clearGrid)
     {
         this.matchingRecipes.clear();
@@ -1651,6 +1886,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
     }
 
+    /**
+     * Updates the request details text and icon based on the current selected request and JEI search output.
+     * If the selected request is null, it will display the JEI search output or the "request item" text.
+     * If the selected request is not null, it will display the selected request's short display string and the
+     * request preview output.
+     * Additionally, it will update the status text and color based on the current grid's craftability and
+     * whether it matches the selected request.
+     */
     private void updateRequestDetails()
     {
         updateCraftButtons();
@@ -1718,7 +1961,71 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
         final boolean craftable = isGridCraftable();
         craftButton.setEnabled(craftable);
-        craftAllButton.setEnabled(craftable);
+        craftAllButton.setEnabled(craftable && hasValidCraftAmount());
+    }
+
+    private void populateCraftAmountFromRequest()
+    {
+        final ItemStack previewOutput = getRequestPreviewOutput();
+        final int requestedCount = previewOutput.isEmpty() ? 0 : previewOutput.getCount();
+        craftAmountInput.setText(requestedCount > 0 ? Integer.toString(requestedCount) : DEFAULT_CRAFT_AMOUNT);
+    }
+
+    private boolean hasValidCraftAmount()
+    {
+        return getCraftAmount() > 0;
+    }
+
+    /**
+     * Gets the craft amount entered by the user in the craft amount input field.
+     * If the input is empty, or cannot be parsed to an integer, 0 is returned.
+     * If the input is invalid, Integer.MAX_VALUE is returned.
+     * 
+     * @return the craft amount entered by the user
+     */
+    private int getCraftAmount()
+    {
+        final String text = sanitizeCraftAmountText(craftAmountInput.getText());
+        if (text.isEmpty())
+        {
+            return 0;
+        }
+
+        try
+        {
+            return Integer.parseInt(text);
+        }
+        catch (final NumberFormatException ignored)
+        {
+            return Integer.MAX_VALUE;
+        }
+    }
+
+    /**
+     * Sanitizes the given input string by removing all non-digit characters.
+     * If the input string is null or empty, an empty string is returned.
+     * 
+     * @param input the input string to be sanitized
+     * @return the sanitized string containing only digits
+     */
+    private static String sanitizeCraftAmountText(final @Nullable String input)
+    {
+        if (input == null || input.isEmpty())
+        {
+            return "";
+        }
+
+        final StringBuilder sanitized = new StringBuilder(input.length());
+        for (int i = 0; i < input.length(); i++)
+        {
+            final char c = input.charAt(i);
+            if (Character.isDigit(c))
+            {
+                sanitized.append(c);
+            }
+        }
+
+        return sanitized.toString();
     }
 
     private Component getReadyStatusText()
@@ -1740,12 +2047,21 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         setStatusText(status, STATUS_TEXT_COLOR);
     }
     
+    /**
+     * Sets the status label's text and color.
+     * @param status The Component to display in the status label.
+     * @param color The color to set the status label's text to.
+     */
     private void setStatusText(final Component status, final int color)
     {
         statusLabel.setTextColor(color);
         statusLabel.setText(status);
     }
 
+    /**
+     * Updates the grid icons, backgrounds, and buttons based on the current recipe and grid contents.
+     * If the recipe is a Domum recipe, it enables the first two slots and disables the rest.
+     */
     private void updateGridIcons()
     {
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
@@ -1760,6 +2076,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         updateRequestDetails();
     }
 
+    /**
+     * Updates the background of a grid slot to indicate the presence or absence of the
+     * ingredient in the warehouse.
+     *
+     * @param slot the index of the grid slot to update
+     */
     private void updateGridBackground(final int slot)
     {
         final Gradient background = gridBackgrounds.get(slot);

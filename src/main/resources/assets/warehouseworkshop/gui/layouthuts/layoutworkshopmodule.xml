@@ -67,6 +67,10 @@
     <button id="includePlayerInventory" size="88 16" pos="128 176" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.include_player_inventory.no)"/>
+    <box pos="12 198" size="216 38" linewidth="1"/>
+    <text id="craftAmountLabel" size="72 10" pos="18 208" color="black"
+          label="$(com.warehouseworkshop.core.gui.workshop.craft_amount.label)"/>
+    <input id="craftAmount" size="40 16" pos="176 204" color="white" textContent="1" maxlength="9"/>
     <button id="clear" size="52 16" pos="37 265" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.clear)"/>

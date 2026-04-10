@@ -28,10 +28,12 @@
   "com.warehouseworkshop.core.gui.workshop.status.invalid": "The current grid is not a valid crafting recipe.",
   "com.warehouseworkshop.core.gui.workshop.request.tooltip": "Select Recipe based on current colony requests.",
   "com.warehouseworkshop.core.gui.workshop.output.tooltip": "Drag a JEI result here, or shift-click a JEI item, to select a craftable recipe. Drag JEI ingredients into the grid.",
+  "com.warehouseworkshop.core.gui.workshop.craft_amount.label": "Craft Quantity",
   "com.warehouseworkshop.core.gui.workshop.output_target.label": "Craft To",
   "com.warehouseworkshop.core.gui.workshop.output_target.inventory": "Inventory",
   "com.warehouseworkshop.core.gui.workshop.output_target.warehouse": "Warehouse",
   "com.warehouseworkshop.core.gui.workshop.include_player_inventory.label": "Use Player Items",
   "com.warehouseworkshop.core.gui.workshop.include_player_inventory.no": "No",
-  "com.warehouseworkshop.core.gui.workshop.include_player_inventory.yes": "Yes"
+  "com.warehouseworkshop.core.gui.workshop.include_player_inventory.yes": "Yes",
+  "com.warehouseworkshop.core.gui.workshop.status.invalid_count": "Enter a craft quantity greater than 0."
 }
