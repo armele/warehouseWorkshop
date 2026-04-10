@@ -619,7 +619,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         final ItemStack recipeOutput = getCurrentGridOutput();
         final int requestedCrafts = getRequestedCraftCount(recipeOutput);
-        final int supportedCrafts = getSupportedCraftCount();
+        final int supportedCrafts = getSupportedCraftCount(requestedCrafts);
 
         if (requestedCrafts <= 0)
         {
@@ -673,7 +673,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      * @return The maximum number of crafts that can be performed.
      */
     @SuppressWarnings("null")
-    private int getSupportedCraftCount()
+    private int getSupportedCraftCount(final int requestedCrafts)
     {
         final Map<ItemStorage, Integer> requiredPerCraft = new HashMap<>();
         for (final ItemStack stack : selectedGrid)
@@ -689,6 +689,59 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return 0;
         }
 
+        final WorkshopRecipe activeRecipe = getActiveRecipe();
+        final Level level = Minecraft.getInstance().level;
+        if (activeRecipe == null || activeRecipe.kind() != RecipeKind.CRAFTING || level == null)
+        {
+            return getBasicSupportedCraftCount(requiredPerCraft);
+        }
+
+        final RecipeHolder<CraftingRecipe> currentRecipe = getCurrentGridRecipe();
+        if (currentRecipe == null)
+        {
+            return getBasicSupportedCraftCount(requiredPerCraft);
+        }
+
+        final CraftingInput input = CraftingInput.of(3, 3, List.copyOf(selectedGrid));
+        if (input == null || input.isEmpty())
+        {
+            return 0;
+        }
+
+        final List<ItemStack> remainingItems = currentRecipe.value().getRemainingItems(input);
+        final Map<ItemStorage, Integer> remainingWarehouseStock = new HashMap<>(warehouseStock);
+        final Map<ItemStorage, Integer> remainingPlayerStock = new HashMap<>(playerStock);
+        final boolean includePlayerInventory = moduleView.shouldIncludePlayerInventory();
+        final boolean outputToWarehouse = moduleView.getOutputTarget().isWarehouse();
+        final int craftLimit = requestedCrafts > 0 ? requestedCrafts : Integer.MAX_VALUE;
+
+        int supportedCrafts = 0;
+        while (supportedCrafts < craftLimit && canConsumeIngredients(requiredPerCraft, remainingWarehouseStock, remainingPlayerStock, includePlayerInventory))
+        {
+            final Map<ItemStorage, Integer> previousUsableStock = requestedCrafts > 0
+                ? Map.of()
+                : snapshotUsableIngredientStock(requiredPerCraft, remainingWarehouseStock, remainingPlayerStock, includePlayerInventory);
+
+            consumeIngredients(requiredPerCraft, remainingWarehouseStock, remainingPlayerStock, includePlayerInventory);
+            addReturnedItems(remainingItems, remainingWarehouseStock, remainingPlayerStock, outputToWarehouse);
+            supportedCrafts++;
+
+            if (requestedCrafts <= 0
+                && previousUsableStock.equals(snapshotUsableIngredientStock(
+                    requiredPerCraft,
+                    remainingWarehouseStock,
+                    remainingPlayerStock,
+                    includePlayerInventory)))
+            {
+                break;
+            }
+        }
+
+        return supportedCrafts;
+    }
+
+    private int getBasicSupportedCraftCount(final Map<ItemStorage, Integer> requiredPerCraft)
+    {
         int supportedCrafts = Integer.MAX_VALUE;
         for (final Map.Entry<ItemStorage, Integer> entry : requiredPerCraft.entrySet())
         {
@@ -696,6 +749,126 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         return supportedCrafts == Integer.MAX_VALUE ? 0 : supportedCrafts;
+    }
+
+    private boolean canConsumeIngredients(
+        final Map<ItemStorage, Integer> requiredPerCraft,
+        final Map<ItemStorage, Integer> remainingWarehouseStock,
+        final Map<ItemStorage, Integer> remainingPlayerStock,
+        final boolean includePlayerInventory)
+    {
+        for (final Map.Entry<ItemStorage, Integer> entry : requiredPerCraft.entrySet())
+        {
+            if (getStockCount(remainingWarehouseStock, entry.getKey())
+                + (includePlayerInventory ? getStockCount(remainingPlayerStock, entry.getKey()) : 0) < entry.getValue())
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private void consumeIngredients(
+        final Map<ItemStorage, Integer> requiredPerCraft,
+        final Map<ItemStorage, Integer> remainingWarehouseStock,
+        final Map<ItemStorage, Integer> remainingPlayerStock,
+        final boolean includePlayerInventory)
+    {
+        for (final Map.Entry<ItemStorage, Integer> entry : requiredPerCraft.entrySet())
+        {
+            int remaining = decrementStock(remainingWarehouseStock, entry.getKey(), entry.getValue());
+            if (remaining > 0 && includePlayerInventory)
+            {
+                decrementStock(remainingPlayerStock, entry.getKey(), remaining);
+            }
+        }
+    }
+
+    private int decrementStock(final Map<ItemStorage, Integer> stock, final ItemStorage ingredient, final int amount)
+    {
+        int remaining = amount;
+        for (final Map.Entry<ItemStorage, Integer> entry : stock.entrySet())
+        {
+            if (!Objects.equals(entry.getKey(), ingredient))
+            {
+                continue;
+            }
+
+            final int removed = Math.min(entry.getValue(), remaining);
+            final int updated = entry.getValue() - removed;
+            if (updated > 0)
+            {
+                entry.setValue(updated);
+            }
+            else
+            {
+                entry.setValue(0);
+            }
+
+            remaining -= removed;
+            if (remaining <= 0)
+            {
+                break;
+            }
+        }
+
+        return remaining;
+    }
+
+    /**
+     * Adds the returned items to the target stock.
+     * If the output target is set to the warehouse, the returned items are added to the remaining warehouse stock.
+     * If the output target is set to the player inventory, the returned items are added to the remaining player stock.
+     * The target stock is updated with the number of items of each type that were returned.
+     * @param returnedItems the list of items that were returned
+     * @param remainingWarehouseStock the map of items to their counts in the remaining warehouse stock
+     * @param remainingPlayerStock the map of items to their counts in the remaining player stock
+     * @param outputToWarehouse whether the output target is the warehouse
+     */
+    @SuppressWarnings("null")
+    private void addReturnedItems(
+        final List<ItemStack> returnedItems,
+        final Map<ItemStorage, Integer> remainingWarehouseStock,
+        final Map<ItemStorage, Integer> remainingPlayerStock,
+        final boolean outputToWarehouse)
+    {
+        final Map<ItemStorage, Integer> targetStock = outputToWarehouse ? remainingWarehouseStock : remainingPlayerStock;
+        for (final ItemStack returned : returnedItems)
+        {
+            if (!returned.isEmpty())
+            {
+                targetStock.merge(new ItemStorage(returned.copy()), returned.getCount(), Integer::sum);
+            }
+        }
+    }
+
+    /**
+     * Returns a snapshot of the usable ingredients in the given stocks.
+     * The snapshot is a map of each required ingredient to the total count of that ingredient in the given stocks.
+     * If includePlayerInventory is true, the count of each ingredient in the remaining player stock is added to the count in the remaining warehouse stock.
+     * @param requiredPerCraft the map of required ingredients to their counts per craft
+     * @param remainingWarehouseStock the map of items to their counts in the remaining warehouse stock
+     * @param remainingPlayerStock the map of items to their counts in the remaining player stock
+     * @param includePlayerInventory whether the count of each ingredient in the remaining player stock should be included
+     * @return a snapshot of the usable ingredients in the given stocks
+     */
+    private Map<ItemStorage, Integer> snapshotUsableIngredientStock(
+        final Map<ItemStorage, Integer> requiredPerCraft,
+        final Map<ItemStorage, Integer> remainingWarehouseStock,
+        final Map<ItemStorage, Integer> remainingPlayerStock,
+        final boolean includePlayerInventory)
+    {
+        final Map<ItemStorage, Integer> snapshot = new HashMap<>();
+        for (final ItemStorage ingredient : requiredPerCraft.keySet())
+        {
+            snapshot.put(
+                ingredient,
+                getStockCount(remainingWarehouseStock, ingredient)
+                    + (includePlayerInventory ? getStockCount(remainingPlayerStock, ingredient) : 0));
+        }
+
+        return snapshot;
     }
 
     private boolean isGridCraftable()
