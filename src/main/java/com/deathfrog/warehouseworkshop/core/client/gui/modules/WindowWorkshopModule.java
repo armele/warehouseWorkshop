@@ -16,6 +16,7 @@ import org.jetbrains.annotations.Nullable;
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.api.colony.buildings.moduleviews.WorkshopModuleView;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
+import com.deathfrog.warehouseworkshop.core.network.RequestWorkshopSettingsMessage;
 import com.deathfrog.warehouseworkshop.core.network.SetWorkshopIncludePlayerInventoryMessage;
 import com.deathfrog.warehouseworkshop.core.network.SetWorkshopOutputTargetMessage;
 import com.deathfrog.warehouseworkshop.core.network.WorkshopCraftMessage;
@@ -176,6 +177,16 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                     .hoverPane(requestIcon)
                     .build();
         }
+
+        PaneBuilders.tooltipBuilder()
+                .append(Component.translatable("com.warehouseworkshop.core.gui.workshop.craft.tooltip"))
+                .hoverPane(craftButton)
+                .build();
+
+        PaneBuilders.tooltipBuilder()
+                .append(Component.translatable("com.warehouseworkshop.core.gui.workshop.craftall.tooltip"))
+                .hoverPane(craftAllButton)
+                .build();
     }
 
     private enum RecipeKind
@@ -228,12 +239,27 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     public void onOpened()
     {
         super.onOpened();
+        new RequestWorkshopSettingsMessage(buildingView.getPosition()).sendToServer();
         refreshWarehouseStock();
         refreshPlayerInventoryStock();
         updateOutputTargetButton();
         updateIncludePlayerInventoryButton();
         updateRequestDetails();
         updateGridIcons();
+    }
+
+    public void refreshPlayerSettings(final BlockPos buildingPos, final OutputTarget outputTarget, final boolean includePlayerInventory)
+    {
+        if (!Objects.equals(buildingView.getPosition(), buildingPos))
+        {
+            return;
+        }
+
+        moduleView.setOutputTarget(outputTarget);
+        moduleView.setIncludePlayerInventory(includePlayerInventory);
+        updateOutputTargetButton();
+        updateIncludePlayerInventoryButton();
+        applySelectedRecipe();
     }
 
     private void toggleOutputTarget()

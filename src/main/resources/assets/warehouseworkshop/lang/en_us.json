@@ -35,5 +35,7 @@
   "com.warehouseworkshop.core.gui.workshop.include_player_inventory.label": "Use Player Items",
   "com.warehouseworkshop.core.gui.workshop.include_player_inventory.no": "No",
   "com.warehouseworkshop.core.gui.workshop.include_player_inventory.yes": "Yes",
-  "com.warehouseworkshop.core.gui.workshop.status.invalid_count": "Enter a craft quantity greater than 0."
+  "com.warehouseworkshop.core.gui.workshop.status.invalid_count": "Enter a craft quantity greater than 0.",
+  "com.warehouseworkshop.core.gui.workshop.craft.tooltip": "Craft the selected recipe.",
+  "com.warehouseworkshop.core.gui.workshop.craftall.tooltip": "Craft the selected recipe as many times as specified above."
 }

@@ -5,6 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
+import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopPlayerSettings;
 import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.colony.buildings.IBuilding;
 
@@ -17,7 +18,7 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Persists the selected workshop crafting output destination on the server.
+ * Persists the selected workshop crafting output destination for the acting player.
  */
 public record SetWorkshopOutputTargetMessage(BlockPos buildingPos, int outputTargetId) implements IServerboundPayload
 {
@@ -60,7 +61,8 @@ public record SetWorkshopOutputTargetMessage(BlockPos buildingPos, int outputTar
         final WorkshopModule module = building.getModule(WorkshopModule.class, candidate -> true);
         if (module != null)
         {
-            module.setOutputTarget(OutputTarget.byId(outputTargetId));
+            final WorkshopPlayerSettings currentSettings = WorkshopPlayerSettings.get(player, buildingPos, module);
+            WorkshopPlayerSettings.save(player, buildingPos, new WorkshopPlayerSettings(OutputTarget.byId(outputTargetId), currentSettings.includePlayerInventory()));
         }
     }
 }

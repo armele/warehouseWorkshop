@@ -13,6 +13,7 @@ import org.jetbrains.annotations.NotNull;
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
+import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopPlayerSettings;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlock;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlockComponent;
 import com.ldtteam.domumornamentum.recipe.ModRecipeTypes;
@@ -152,7 +153,8 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         }
 
         final List<ItemStack> baseIngredients = copyIngredients(normalizedGrid);
-        final boolean includePlayerInventory = module.shouldIncludePlayerInventory();
+        final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos, module);
+        final boolean includePlayerInventory = settings.includePlayerInventory();
         final IItemHandler warehouseInventory = building.getItemHandlerCap();
         final IItemHandler playerInventory = new PlayerMainInvWrapper(player.getInventory());
         if (!hasCraftingIngredients(copyIngredients(baseIngredients), warehouseInventory, playerInventory, includePlayerInventory))
@@ -164,7 +166,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
 
         final ItemStack craftedResult = recipe.get().value().assemble(input, player.level().registryAccess()).copy();
         final List<ItemStack> remainingItems = recipe.get().value().getRemainingItems(input);
-        final OutputTarget outputTarget = module.getOutputTarget();
+        final OutputTarget outputTarget = settings.outputTarget();
         int crafted = 0;
 
         for (int i = 0; i < craftCount; i++)
@@ -247,7 +249,8 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             return;
         }
 
-        final boolean includePlayerInventory = module.shouldIncludePlayerInventory();
+        final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos, module);
+        final boolean includePlayerInventory = settings.includePlayerInventory();
         final IItemHandler warehouseInventory = building.getItemHandlerCap();
         final IItemHandler playerInventory = new PlayerMainInvWrapper(player.getInventory());
         if (!hasCraftingIngredients(copyIngredients(baseIngredients), warehouseInventory, playerInventory, includePlayerInventory))
@@ -257,7 +260,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             return;
         }
 
-        final OutputTarget outputTarget = module.getOutputTarget();
+        final OutputTarget outputTarget = settings.outputTarget();
         int crafted = 0;
         for (int i = 0; i < craftCount; i++)
         {

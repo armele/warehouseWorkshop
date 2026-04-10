@@ -10,30 +10,28 @@ import com.minecolonies.api.colony.buildings.IBuilding;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Persists whether workshop crafting may use the acting player's inventory.
+ * Requests the acting player's persisted workshop settings for the viewed building.
  */
-public record SetWorkshopIncludePlayerInventoryMessage(BlockPos buildingPos, boolean includePlayerInventory) implements IServerboundPayload
+public record RequestWorkshopSettingsMessage(BlockPos buildingPos) implements IServerboundPayload
 {
     @SuppressWarnings("null")
-    public static final Type<SetWorkshopIncludePlayerInventoryMessage> ID = new Type<>(ResourceLocation.fromNamespaceAndPath(WarehouseWorkshopMod.MODID, "set_workshop_include_player_inventory"));
-    
+    public static final Type<RequestWorkshopSettingsMessage> ID = new Type<>(ResourceLocation.fromNamespaceAndPath(WarehouseWorkshopMod.MODID, "request_workshop_settings"));
+
     @SuppressWarnings("null")
-    public static final StreamCodec<RegistryFriendlyByteBuf, SetWorkshopIncludePlayerInventoryMessage> STREAM_CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf, RequestWorkshopSettingsMessage> STREAM_CODEC = StreamCodec.composite(
         BlockPos.STREAM_CODEC,
-        SetWorkshopIncludePlayerInventoryMessage::buildingPos,
-        ByteBufCodecs.BOOL,
-        SetWorkshopIncludePlayerInventoryMessage::includePlayerInventory,
-        SetWorkshopIncludePlayerInventoryMessage::new);
+        RequestWorkshopSettingsMessage::buildingPos,
+        RequestWorkshopSettingsMessage::new);
 
     @Override
-    public Type<SetWorkshopIncludePlayerInventoryMessage> type()
+    public Type<RequestWorkshopSettingsMessage> type()
     {
         return ID;
     }
@@ -46,7 +44,7 @@ public record SetWorkshopIncludePlayerInventoryMessage(BlockPos buildingPos, boo
 
     private void execute(final Player player)
     {
-        if (player == null)
+        if (!(player instanceof final ServerPlayer serverPlayer))
         {
             return;
         }
@@ -58,10 +56,12 @@ public record SetWorkshopIncludePlayerInventoryMessage(BlockPos buildingPos, boo
         }
 
         final WorkshopModule module = building.getModule(WorkshopModule.class, candidate -> true);
-        if (module != null)
+        if (module == null)
         {
-            final WorkshopPlayerSettings currentSettings = WorkshopPlayerSettings.get(player, buildingPos, module);
-            WorkshopPlayerSettings.save(player, buildingPos, new WorkshopPlayerSettings(currentSettings.outputTarget(), includePlayerInventory));
+            return;
         }
+
+        final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos, module);
+        ClientboundWorkshopSettingsMessage.sendToPlayer(serverPlayer, buildingPos, settings);
     }
 }
