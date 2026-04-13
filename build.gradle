@@ -116,8 +116,8 @@ dependencies {
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
 
-    compileOnly name: 'minecolonies-1.1.1290-1.21.1-snapshot'
-    localRuntime files ('../Minecolonies/build/libs/minecolonies-1.1.1290-1.21.1-snapshot.jar')
+    compileOnly name: 'minecolonies-1.1.1300-1.21.1-snapshot'
+    localRuntime files ('../Minecolonies/build/libs/minecolonies-1.1.1300-1.21.1-snapshot.jar')
     
     compileOnly name: 'multipiston-1.2.58-1.21.1'
     localRuntime files ('../Minecolonies/build/libs/multipiston-1.2.58-1.21.1.jar')

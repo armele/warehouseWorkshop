@@ -217,6 +217,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         @Nullable RecipeHolder<CraftingRecipe> craftingRecipe,
         @Nullable RecipeHolder<ArchitectsCutterRecipe> domumRecipe)
     {
+
         @SuppressWarnings("null")
         static WorkshopRecipe crafting(final RecipeHolder<CraftingRecipe> recipe, final Level level)
         {
