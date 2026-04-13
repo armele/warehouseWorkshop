@@ -111,6 +111,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private @Nullable IRequest<?> selectedRequest;
     private ItemStack jeiSearchOutput = ItemStack.EMPTY;
     private int selectedRecipeIndex = -1;
+    private boolean playerSettingsLoaded;
 
     public WindowWorkshopModule(final WorkshopModuleView moduleView)
     {
@@ -239,6 +240,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     public void onOpened()
     {
         super.onOpened();
+        playerSettingsLoaded = false;
         new RequestWorkshopSettingsMessage(buildingView.getPosition()).sendToServer();
         refreshWarehouseStock();
         refreshPlayerInventoryStock();
@@ -255,15 +257,25 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return;
         }
 
+        final boolean ingredientSourceChanged = !playerSettingsLoaded || moduleView.shouldIncludePlayerInventory() != includePlayerInventory;
+        playerSettingsLoaded = true;
         moduleView.setOutputTarget(outputTarget);
         moduleView.setIncludePlayerInventory(includePlayerInventory);
         updateOutputTargetButton();
         updateIncludePlayerInventoryButton();
-        applySelectedRecipe();
+        if (ingredientSourceChanged)
+        {
+            applySelectedRecipe();
+        }
     }
 
     private void toggleOutputTarget()
     {
+        if (!playerSettingsLoaded)
+        {
+            return;
+        }
+
         final OutputTarget outputTarget = moduleView.getOutputTarget() == OutputTarget.WAREHOUSE_INVENTORY
             ? OutputTarget.PLAYER_INVENTORY
             : OutputTarget.WAREHOUSE_INVENTORY;
@@ -274,6 +286,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void toggleIncludePlayerInventory()
     {
+        if (!playerSettingsLoaded)
+        {
+            return;
+        }
+
         final boolean includePlayerInventory = !moduleView.shouldIncludePlayerInventory();
         moduleView.setIncludePlayerInventory(includePlayerInventory);
         new SetWorkshopIncludePlayerInventoryMessage(buildingView.getPosition(), includePlayerInventory).sendToServer();
@@ -284,14 +301,20 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void updateOutputTargetButton()
     {
-        outputTargetButton.setText(Component.translatable(moduleView.getOutputTarget() == OutputTarget.WAREHOUSE_INVENTORY
+        outputTargetButton.setEnabled(playerSettingsLoaded);
+        outputTargetButton.setText(Component.translatable(!playerSettingsLoaded
+            ? "com.warehouseworkshop.core.gui.workshop.settings.loading"
+            : moduleView.getOutputTarget() == OutputTarget.WAREHOUSE_INVENTORY
             ? "com.warehouseworkshop.core.gui.workshop.output_target.warehouse"
             : "com.warehouseworkshop.core.gui.workshop.output_target.inventory"));
     }
 
     private void updateIncludePlayerInventoryButton()
     {
-        includePlayerInventoryButton.setText(Component.translatable(moduleView.shouldIncludePlayerInventory()
+        includePlayerInventoryButton.setEnabled(playerSettingsLoaded);
+        includePlayerInventoryButton.setText(Component.translatable(!playerSettingsLoaded
+            ? "com.warehouseworkshop.core.gui.workshop.settings.loading"
+            : moduleView.shouldIncludePlayerInventory()
             ? "com.warehouseworkshop.core.gui.workshop.include_player_inventory.yes"
             : "com.warehouseworkshop.core.gui.workshop.include_player_inventory.no"));
     }
@@ -405,7 +428,6 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
         if (selectedRecipe == null)
         {
-            updateRequestDetails();
             updateGridIcons();
             return;
         }
@@ -413,7 +435,6 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         if (selectedRecipe.kind() == RecipeKind.DOMUM)
         {
             applySelectedDomumRecipe(selectedRecipe);
-            updateRequestDetails();
             updateGridIcons();
             return;
         }
@@ -454,7 +475,6 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             slotStates.set(slot, SlotState.MISSING);
         }
 
-        updateRequestDetails();
         updateGridIcons();
     }
 
@@ -580,6 +600,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void performCraft(final int craftCount)
     {
+        if (!playerSettingsLoaded)
+        {
+            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.settings_loading"));
+            return;
+        }
+
         if (getActiveRecipe() == null)
         {
             setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.norecipe"));
@@ -1951,6 +1977,16 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
         final WorkshopRecipe activeRecipe = getActiveRecipe();
+        if (!playerSettingsLoaded)
+        {
+            recipeLabel.setText(selectedRecipe != null
+                ? Component.translatable("com.warehouseworkshop.core.gui.workshop.recipe.index", selectedRecipeIndex + 1, matchingRecipes.size())
+                : Component.translatable("com.warehouseworkshop.core.gui.workshop.recipe.manual"));
+            outputIcon.setItem(activeRecipe == null ? ItemStack.EMPTY : getCurrentGridOutput());
+            setStatusText(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.settings_loading"));
+            return;
+        }
+
         if (activeRecipe == null)
         {
             recipeLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.recipe.none"));
@@ -1985,7 +2021,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void updateCraftButtons()
     {
-        final boolean craftable = isGridCraftable();
+        final boolean craftable = playerSettingsLoaded && isGridCraftable();
         craftButton.setEnabled(craftable);
         craftAllButton.setEnabled(craftable && hasValidCraftAmount());
     }
