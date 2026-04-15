@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import javax.annotation.Nonnull;
 
@@ -16,6 +18,8 @@ import org.jetbrains.annotations.Nullable;
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.api.colony.buildings.moduleviews.WorkshopModuleView;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
+import com.deathfrog.warehouseworkshop.core.compatibility.recipes.OptionalRecipeSupport;
+import com.deathfrog.warehouseworkshop.core.compatibility.recipes.OptionalRecipeSupport.CraftingSlotRequirement;
 import com.deathfrog.warehouseworkshop.core.network.RequestWorkshopSettingsMessage;
 import com.deathfrog.warehouseworkshop.core.network.SetWorkshopIncludePlayerInventoryMessage;
 import com.deathfrog.warehouseworkshop.core.network.SetWorkshopOutputTargetMessage;
@@ -45,6 +49,7 @@ import com.minecolonies.core.tileentities.TileEntityRack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
@@ -58,8 +63,6 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeManager;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.crafting.ShapedRecipe;
-import net.minecraft.world.item.crafting.ShapelessRecipe;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -343,6 +346,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         open();
     }
 
+    /**
+     * Selects a request for the workshop and updates the GUI to reflect the selected request.
+     * This method clears the JEI selection, sets the output label text, sets the selected request,
+     * extracts the requested outputs from the request, refreshes the player inventory stock,
+     * finds matching recipes for the requested outputs, sets the selected recipe index,
+     * populates the craft amount from the request, and applies the selected recipe.
+     *
+     * @param request the request to select
+     */
     private void selectRequest(@NotNull final IRequest<?> request)
     {
         clearJeiSelection(true);
@@ -357,6 +369,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         applySelectedRecipe();
     }
 
+    /**
+     * Selects a JEI output for the workshop and updates the GUI to reflect the selected output.
+     * This method clears the request selection, sets the output label text, sets the selected JEI output,
+     * refreshes the player inventory stock, finds matching recipes for the selected JEI output,
+     * sets the selected recipe index, and applies the selected recipe.
+     *
+     * @param output the JEI output to select
+     */
     public void selectJeiOutput(@NotNull final ItemStack output)
     {
         if (output.isEmpty())
@@ -375,6 +395,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         applySelectedRecipe();
     }
 
+    /**
+     * Applies a JEI ingredient to a workshop slot. This method clears the current request selection,
+     * clears the current JEI selection (but does not clear the crafting grid), sets the output label text,
+     * sets the selected ingredient in the workshop grid, and updates the grid icons.
+     *
+     * @param slot the slot to apply the ingredient to
+     * @param stack the ingredient to apply
+     */
     public void applyJeiIngredientToSlot(final int slot, @NotNull final ItemStack stack)
     {
         if (slot < 0 || slot >= GRID_SIZE || stack.isEmpty() || !canAcceptIngredientInSlot(slot))
@@ -416,6 +444,18 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         applySelectedRecipe();
     }
 
+    /**
+     * Applies the currently selected recipe to the workshop grid. This method will clear the current request selection,
+     * clear the current JEI selection (but does not clear the crafting grid), and then attempts to apply
+     * the selected recipe to the workshop grid. The method will first clear all slots in the grid, and then
+     * attempt to apply each ingredient in the recipe to a slot in the grid. If the ingredient can be
+     * found in the warehouse stock, it will be reserved from the stock and the slot will be set to present. If
+     * the ingredient cannot be found in the warehouse stock but can be found in the player's inventory, it
+     * will be reserved from the player's inventory and the slot will be set to present. If the ingredient cannot
+     * be found in either the warehouse stock or the player's inventory, the slot will be set to missing.
+     *
+     * If the selected recipe is a DOMUM recipe, it will be applied using the applySelectedDomumRecipe method.
+     */
     private void applySelectedRecipe()
     {
         for (int i = 0; i < GRID_SIZE; i++)
@@ -440,23 +480,25 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return;
         }
 
-        final List<Ingredient> slottedIngredients = buildSlottedIngredients(selectedRecipe.craftingRecipe().value());
+        final List<CraftingSlotRequirement> slotRequirements =
+            OptionalRecipeSupport.buildCraftingSlotRequirements(selectedRecipe.craftingRecipe().value(), GRID_SIZE);
         final Map<ItemStorage, Integer> remainingStock = new HashMap<>(warehouseStock);
         final Map<ItemStorage, Integer> remainingPlayerStock = new HashMap<>(playerStock);
+        final Map<ResourceLocation, Set<ResourceLocation>> reservedUniqueItems = new HashMap<>();
 
         for (int slot = 0; slot < GRID_SIZE; slot++)
         {
-            final Ingredient ingredient = slottedIngredients.get(slot);
-            if (ingredient.isEmpty())
+            final CraftingSlotRequirement requirement = slotRequirements.get(slot);
+            if (requirement.ingredient().isEmpty())
             {
                 continue;
             }
 
-            displayGrid.set(slot, getIngredientDisplayStack(ingredient));
-            final List<ItemStorage> matches = findWarehouseMatches(ingredient);
+            displayGrid.set(slot, getIngredientDisplayStack(requirement.ingredient()));
+            final List<ItemStorage> matches = findWarehouseMatches(requirement.ingredient());
             slotMatches.get(slot).addAll(matches);
 
-            if (tryReserveSlotFromMatches(slot, matches, remainingStock))
+            if (tryReserveSlotFromMatches(slot, requirement, matches, remainingStock, reservedUniqueItems))
             {
                 setSlotPresent(slot);
                 continue;
@@ -464,9 +506,9 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
             if (moduleView.shouldIncludePlayerInventory())
             {
-                final List<ItemStorage> playerMatches = findPlayerInventoryMatches(ingredient);
+                final List<ItemStorage> playerMatches = findPlayerInventoryMatches(requirement.ingredient());
                 slotMatches.get(slot).addAll(playerMatches);
-                if (tryReserveSlotFromMatches(slot, playerMatches, remainingPlayerStock))
+                if (tryReserveSlotFromMatches(slot, requirement, playerMatches, remainingPlayerStock, reservedUniqueItems))
                 {
                     setSlotPresent(slot);
                     continue;
@@ -479,6 +521,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         updateGridIcons();
     }
 
+    /**
+     * Applies the currently selected DOMUM recipe to the workshop grid. This method will clear the current request selection,
+     * clear the current JEI selection (but does not clear the crafting grid), and then attempts to apply
+     * each component of the DOMUM recipe to a slot in the grid. If the component can be found in the warehouse stock,
+     * it will be reserved from the stock and the slot will be set to present. If the component cannot be found in the
+     * warehouse stock but can be found in the player's inventory, it will be reserved from the player's inventory and the
+     * slot will be set to present. If the component cannot be found in either the warehouse stock or the player's inventory,
+     * the slot will be set to missing.
+     */
     private void applySelectedDomumRecipe(final WorkshopRecipe selectedRecipe)
     {
         final List<DomumSlotRequirement> requirements = getDomumRequirements(selectedRecipe);
@@ -496,7 +547,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             final List<ItemStorage> matches = findDomumMatches(requirements.get(component).material(), warehouseStock);
             slotMatches.get(slot).addAll(matches);
 
-            if (tryReserveSlotFromMatches(slot, matches, remainingStock))
+            if (tryReserveSlotFromMatches(slot, CraftingSlotRequirement.empty(), matches, remainingStock, new HashMap<>()))
             {
                 setSlotPresent(slot);
                 continue;
@@ -506,7 +557,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             {
                 final List<ItemStorage> playerMatches = findDomumMatches(requirements.get(component).material(), playerStock);
                 slotMatches.get(slot).addAll(playerMatches);
-                if (tryReserveSlotFromMatches(slot, playerMatches, remainingPlayerStock))
+                if (tryReserveSlotFromMatches(slot, CraftingSlotRequirement.empty(), playerMatches, remainingPlayerStock, new HashMap<>()))
                 {
                     setSlotPresent(slot);
                     continue;
@@ -523,22 +574,68 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         slotStates.set(slot, SlotState.PRESENT);
     }
 
-    private boolean tryReserveSlotFromMatches(final int slot, final List<ItemStorage> matches, final Map<ItemStorage, Integer> remainingStock)
+    private boolean tryReserveSlotFromMatches(
+        final int slot,
+        final CraftingSlotRequirement requirement,
+        final List<ItemStorage> matches,
+        final Map<ItemStorage, Integer> remainingStock,
+        final Map<ResourceLocation, Set<ResourceLocation>> reservedUniqueItems)
     {
         for (final ItemStorage match : matches)
         {
             final int available = remainingStock.getOrDefault(match, 0);
-            if (available > 0)
+            if (available > 0 && canUseUniqueCandidate(requirement, match.getItemStack(), reservedUniqueItems))
             {
                 final ItemStack chosen = match.getItemStack().copy();
                 chosen.setCount(1);
                 selectedGrid.set(slot, chosen);
                 remainingStock.put(match, available - 1);
+                reserveUniqueCandidate(requirement, chosen, reservedUniqueItems);
                 return true;
             }
         }
 
         return false;
+    }
+
+    private boolean canUseUniqueCandidate(
+        final CraftingSlotRequirement requirement,
+        final ItemStack stack,
+        final Map<ResourceLocation, Set<ResourceLocation>> reservedUniqueItems)
+    {
+        if (requirement.uniqueGroup() == null)
+        {
+            return true;
+        }
+
+        @SuppressWarnings("null")
+        final ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        return itemId != null && !reservedUniqueItems.getOrDefault(requirement.uniqueGroup(), Set.of()).contains(itemId);
+    }
+
+    /**
+     * Reserves the given ItemStack as used for the given unique group, if the ItemStack is not null and the requirement has a unique group.
+     * This method does not check if the ItemStack can be used for the requirement (i.e. it does not check if the ItemStack matches the requirement's ingredient).
+     * @param requirement the requirement to reserve the ItemStack for
+     * @param stack the ItemStack to reserve
+     * @param reservedUniqueItems the map of reserved unique items
+     */
+    private void reserveUniqueCandidate(
+        final CraftingSlotRequirement requirement,
+        final ItemStack stack,
+        final Map<ResourceLocation, Set<ResourceLocation>> reservedUniqueItems)
+    {
+        if (requirement.uniqueGroup() == null)
+        {
+            return;
+        }
+
+        @SuppressWarnings("null")
+        final ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        if (itemId != null)
+        {
+            reservedUniqueItems.computeIfAbsent(requirement.uniqueGroup(), ignored -> new HashSet<>()).add(itemId);
+        }
     }
 
     private void setActiveSlot(final int slot)
@@ -548,7 +645,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return;
         }
 
-        if (slotStates.get(slot) == SlotState.MISSING)
+        if (slotStates.get(slot) != SlotState.EMPTY && !displayGrid.get(slot).isEmpty())
         {
             final int clickThroughAmount = getClickThroughCraftAmount(slot);
             selectJeiOutput(displayGrid.get(slot));
@@ -599,6 +696,10 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         performCraft(craftCount);
     }
 
+    /**
+     * Sends a craft request to the server to perform a workshop craft.
+     * @param craftCount The number of times to craft the active recipe.
+     */
     private void performCraft(final int craftCount)
     {
         if (!playerSettingsLoaded)
@@ -966,6 +1067,17 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
     }
 
+    /**
+     * Decrements the given amount of the given ingredient from the given stock map.
+     * If the amount to decrement is greater than the current stock of the ingredient, the remaining amount is returned.
+     * If the amount to decrement is less than or equal to the current stock of the ingredient, the stock count is updated
+     * to reflect the new amount and 0 is returned.
+     *
+     * @param stock the map of items to their counts in the stock
+     * @param ingredient the ingredient to decrement
+     * @param amount the amount of the ingredient to decrement
+     * @return the remaining amount of the ingredient that was not decremented
+     */
     private int decrementStock(final Map<ItemStorage, Integer> stock, final ItemStorage ingredient, final int amount)
     {
         int remaining = amount;
@@ -1280,12 +1392,22 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matches;
     }
 
+    /**
+     * Builds a list of matches for the given recipe, with the index of the outer list corresponding to the slot index of the recipe.
+     * Each inner list will contain the ItemStorage objects that match the ingredient at the corresponding slot.
+     * If the ingredient at the slot cannot be found in the warehouse stock or the player's inventory, the inner list will be empty.
+     * If the player's inventory should be included in the search (moduleView.shouldIncludePlayerInventory() returns true),
+     * the inner lists will also contain matches from the player's inventory.
+     * @param recipe the crafting recipe to build matches for
+     * @return a list of lists of ItemStorage objects, or null if any ingredient cannot be found in the warehouse stock or the player's inventory
+     */
     private @Nullable List<List<ItemStorage>> buildSlotMatches(final CraftingRecipe recipe)
     {
-        final List<Ingredient> slottedIngredients = buildSlottedIngredients(recipe);
+        final List<CraftingSlotRequirement> slotRequirements = OptionalRecipeSupport.buildCraftingSlotRequirements(recipe, GRID_SIZE);
         final List<List<ItemStorage>> matches = new ArrayList<>(GRID_SIZE);
         final Map<ItemStorage, Integer> remainingStock = new HashMap<>(warehouseStock);
         final Map<ItemStorage, Integer> remainingPlayerStock = new HashMap<>(playerStock);
+        final Map<ResourceLocation, Set<ResourceLocation>> reservedUniqueItems = new HashMap<>();
 
         for (int i = 0; i < GRID_SIZE; i++)
         {
@@ -1294,25 +1416,25 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         for (int slot = 0; slot < GRID_SIZE; slot++)
         {
-            final Ingredient ingredient = slottedIngredients.get(slot);
-            if (ingredient.isEmpty())
+            final CraftingSlotRequirement requirement = slotRequirements.get(slot);
+            if (requirement.ingredient().isEmpty())
             {
                 continue;
             }
 
-            final List<ItemStorage> candidates = findWarehouseMatches(ingredient);
+            final List<ItemStorage> candidates = findWarehouseMatches(requirement.ingredient());
             matches.get(slot).addAll(candidates);
 
-            if (reserveFirstAvailable(candidates, remainingStock))
+            if (reserveFirstAvailable(requirement, candidates, remainingStock, reservedUniqueItems))
             {
                 continue;
             }
 
             if (moduleView.shouldIncludePlayerInventory())
             {
-                final List<ItemStorage> playerCandidates = findPlayerInventoryMatches(ingredient);
+                final List<ItemStorage> playerCandidates = findPlayerInventoryMatches(requirement.ingredient());
                 matches.get(slot).addAll(playerCandidates);
-                if (reserveFirstAvailable(playerCandidates, remainingPlayerStock))
+                if (reserveFirstAvailable(requirement, playerCandidates, remainingPlayerStock, reservedUniqueItems))
                 {
                     continue;
                 }
@@ -1324,6 +1446,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matches;
     }
 
+    /**
+     * Builds a list of lists of item storages that match the given DOMUM recipe requirements.
+     * Each inner list contains item storages that match the requirement at the given index.
+     * The outer list is in the same order as the DOMUM recipe requirements.
+     *
+     * @param recipe The workshop recipe to build the slot matches for.
+     * @return A list of lists of item storages that match the given DOMUM recipe requirements, or null if the recipe has no requirements.
+     */
     private @Nullable List<List<ItemStorage>> buildDomumSlotMatches(final WorkshopRecipe recipe)
     {
         final List<DomumSlotRequirement> requirements = getDomumRequirements(recipe);
@@ -1346,7 +1476,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             final List<ItemStorage> candidates = findDomumMatches(requirements.get(component).material(), warehouseStock);
             matches.get(slot).addAll(candidates);
 
-            if (reserveFirstAvailable(candidates, remainingStock))
+            if (reserveFirstAvailable(CraftingSlotRequirement.empty(), candidates, remainingStock, new HashMap<>()))
             {
                 continue;
             }
@@ -1355,7 +1485,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             {
                 final List<ItemStorage> playerCandidates = findDomumMatches(requirements.get(component).material(), playerStock);
                 matches.get(slot).addAll(playerCandidates);
-                if (reserveFirstAvailable(playerCandidates, remainingPlayerStock))
+                if (reserveFirstAvailable(CraftingSlotRequirement.empty(), playerCandidates, remainingPlayerStock, new HashMap<>()))
                 {
                     continue;
                 }
@@ -1367,6 +1497,16 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matches;
     }
 
+    /**
+     * Gets the number of ingredients in the given workshop recipe that match the given slot index.
+     * If the recipe is a DOMUM recipe, this method will return the number of components in the recipe that match the given slot index.
+     * If the recipe is a shaping recipe, this method will return the number of ingredients in the recipe that match the given slot index.
+     * If the recipe is a shapeless recipe, this method will return the number of ingredients in the recipe that match the given slot index.
+     *
+     * @param recipe The workshop recipe to get the ingredient count for.
+     * @param slot The slot index to get the ingredient count for.
+     * @return The number of ingredients in the given workshop recipe that match the given slot index.
+     */
     private int getIngredientCountPerCraft(final WorkshopRecipe recipe, final int slot)
     {
         if (recipe.kind() == RecipeKind.DOMUM)
@@ -1396,22 +1536,23 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return 0;
         }
 
-        final List<Ingredient> slottedIngredients = buildSlottedIngredients(recipe.craftingRecipe().value());
-        if (slot < 0 || slot >= slottedIngredients.size())
+        final List<CraftingSlotRequirement> slotRequirements =
+            OptionalRecipeSupport.buildCraftingSlotRequirements(recipe.craftingRecipe().value(), GRID_SIZE);
+        if (slot < 0 || slot >= slotRequirements.size())
         {
             return 0;
         }
 
-        final ItemStack targetDisplayStack = getIngredientDisplayStack(slottedIngredients.get(slot));
+        final ItemStack targetDisplayStack = getIngredientDisplayStack(slotRequirements.get(slot).ingredient());
         if (targetDisplayStack.isEmpty())
         {
             return 0;
         }
 
         int matches = 0;
-        for (final Ingredient ingredient : slottedIngredients)
+        for (final CraftingSlotRequirement requirement : slotRequirements)
         {
-            if (ItemStackUtils.compareItemStacksIgnoreStackSize(targetDisplayStack, getIngredientDisplayStack(ingredient), false, true))
+            if (ItemStackUtils.compareItemStacksIgnoreStackSize(targetDisplayStack, getIngredientDisplayStack(requirement.ingredient()), false, true))
             {
                 matches++;
             }
@@ -1424,54 +1565,24 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
     }
 
-    private boolean reserveFirstAvailable(final List<ItemStorage> candidates, final Map<ItemStorage, Integer> remainingStock)
+    private boolean reserveFirstAvailable(
+        final CraftingSlotRequirement requirement,
+        final List<ItemStorage> candidates,
+        final Map<ItemStorage, Integer> remainingStock,
+        final Map<ResourceLocation, Set<ResourceLocation>> reservedUniqueItems)
     {
         for (final ItemStorage candidate : candidates)
         {
             final int available = remainingStock.getOrDefault(candidate, 0);
-            if (available > 0)
+            if (available > 0 && canUseUniqueCandidate(requirement, candidate.getItemStack(), reservedUniqueItems))
             {
                 remainingStock.put(candidate, available - 1);
+                reserveUniqueCandidate(requirement, candidate.getItemStack(), reservedUniqueItems);
                 return true;
             }
         }
 
         return false;
-    }
-
-    private List<Ingredient> buildSlottedIngredients(final CraftingRecipe recipe)
-    {
-        final List<Ingredient> slots = new ArrayList<>(Collections.nCopies(GRID_SIZE, Ingredient.EMPTY));
-        final List<Ingredient> ingredients = recipe.getIngredients();
-
-        if (recipe instanceof final ShapedRecipe shapedRecipe)
-        {
-            final int width = shapedRecipe.getWidth();
-            final int height = shapedRecipe.getHeight();
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    slots.set((y * 3) + x, ingredients.get((y * width) + x));
-                }
-            }
-        }
-        else if (recipe instanceof final ShapelessRecipe shapelessRecipe)
-        {
-            for (int i = 0; i < Math.min(GRID_SIZE, shapelessRecipe.getIngredients().size()); i++)
-            {
-                slots.set(i, shapelessRecipe.getIngredients().get(i));
-            }
-        }
-        else
-        {
-            for (int i = 0; i < Math.min(GRID_SIZE, ingredients.size()); i++)
-            {
-                slots.set(i, ingredients.get(i));
-            }
-        }
-
-        return slots;
     }
 
     private List<ItemStorage> findWarehouseMatches(final Ingredient ingredient)
@@ -1484,6 +1595,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return findMatches(ingredient, playerStock);
     }
 
+    /**
+     * Finds all matches in the given stock for the given ingredient.
+     * @param ingredient The ingredient to find matches for.
+     * @param stock The stock to search for matches.
+     * @return A list of matches, sorted by amount in descending order, and then by name in case insensitive order.
+     */
     private List<ItemStorage> findMatches(final Ingredient ingredient, final Map<ItemStorage, Integer> stock)
     {
         final List<ItemStorage> matches = new ArrayList<>();
@@ -1503,6 +1620,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return matches;
     }
 
+    /**
+     * Finds all matches in the given stock for the given domum material.
+     * @param material The material to find matches for.
+     * @param stock The stock to search for matches.
+     * @return A list of matches, sorted by amount in descending order, and then by name in case insensitive order.
+     */
     private List<ItemStorage> findDomumMatches(final Block material, final Map<ItemStorage, Integer> stock)
     {
         final List<ItemStorage> matches = new ArrayList<>();

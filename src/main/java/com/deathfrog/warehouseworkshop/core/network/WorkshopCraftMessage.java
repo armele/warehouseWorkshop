@@ -2,9 +2,11 @@ package com.deathfrog.warehouseworkshop.core.network;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import javax.annotation.Nonnull;
 
@@ -14,6 +16,8 @@ import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopPlayerSettings;
+import com.deathfrog.warehouseworkshop.core.compatibility.recipes.OptionalRecipeSupport;
+import com.deathfrog.warehouseworkshop.core.compatibility.recipes.OptionalRecipeSupport.CraftingSlotRequirement;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlock;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlockComponent;
 import com.ldtteam.domumornamentum.recipe.ModRecipeTypes;
@@ -24,6 +28,7 @@ import com.minecolonies.api.colony.buildings.IBuilding;
 import com.minecolonies.api.util.InventoryUtils;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -35,6 +40,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CraftingRecipe;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -152,12 +158,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             return;
         }
 
-        final List<ItemStack> baseIngredients = copyIngredients(normalizedGrid);
+        final List<CraftingIngredientRequirement> requiredIngredients = buildCraftingIngredientRequirements(recipe.get().value(), normalizedGrid);
         final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos, module);
         final boolean includePlayerInventory = settings.includePlayerInventory();
         final IItemHandler warehouseInventory = building.getItemHandlerCap();
         final IItemHandler playerInventory = new PlayerMainInvWrapper(player.getInventory());
-        if (!hasCraftingIngredients(copyIngredients(baseIngredients), warehouseInventory, playerInventory, includePlayerInventory))
+        if (!hasCraftingIngredientRequirements(requiredIngredients, warehouseInventory, playerInventory, includePlayerInventory))
         {
             player.displayClientMessage(getMissingStatusText(includePlayerInventory), true);
             sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
@@ -171,13 +177,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
 
         for (int i = 0; i < craftCount; i++)
         {
-            final List<ItemStack> ingredients = copyIngredients(baseIngredients);
-            if (!hasCraftingIngredients(copyIngredients(ingredients), warehouseInventory, playerInventory, includePlayerInventory))
+            if (!hasCraftingIngredientRequirements(requiredIngredients, warehouseInventory, playerInventory, includePlayerInventory))
             {
                 break;
             }
 
-            if (!removeIngredients(ingredients, warehouseInventory, playerInventory, includePlayerInventory))
+            if (!removeCraftingIngredientRequirements(requiredIngredients, warehouseInventory, playerInventory, includePlayerInventory))
             {
                 break;
             }
@@ -348,6 +353,25 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return copies;
     }
 
+    private static List<CraftingIngredientRequirement> buildCraftingIngredientRequirements(
+        final CraftingRecipe recipe,
+        final List<ItemStack> normalizedGrid)
+    {
+        final List<CraftingSlotRequirement> slotRequirements = OptionalRecipeSupport.buildCraftingSlotRequirements(recipe, 9);
+        final List<CraftingIngredientRequirement> requirements = new ArrayList<>(slotRequirements.size());
+        for (int slot = 0; slot < Math.min(slotRequirements.size(), normalizedGrid.size()); slot++)
+        {
+            final CraftingSlotRequirement requirement = slotRequirements.get(slot);
+            final ItemStack preferred = normalizedGrid.get(slot);
+            if (!requirement.ingredient().isEmpty() && !preferred.isEmpty())
+            {
+                requirements.add(new CraftingIngredientRequirement(requirement.ingredient(), preferred.copy(), requirement.uniqueGroup()));
+            }
+        }
+
+        return requirements;
+    }
+
     /**
      * Checks if all the ingredients in the given list are available in the given item handlers.
      * If includePlayerInventory is true, the player's inventory is also checked.
@@ -383,6 +407,39 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             if (available < entry.getValue())
             {
                 return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static boolean hasCraftingIngredientRequirements(
+        final List<CraftingIngredientRequirement> requirements,
+        final IItemHandler warehouseInventory,
+        final IItemHandler playerInventory,
+        final boolean includePlayerInventory)
+    {
+        final List<ItemStack> available = snapshotInventory(warehouseInventory);
+        final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems = new HashMap<>();
+        if (includePlayerInventory)
+        {
+            available.addAll(snapshotInventory(playerInventory));
+        }
+
+        for (final CraftingIngredientRequirement requirement : requirements)
+        {
+            final int matchIndex = findMatchingStackIndex(available, requirement, usedUniqueItems);
+            if (matchIndex < 0)
+            {
+                return false;
+            }
+
+            final ItemStack matched = available.get(matchIndex);
+            markUniqueIngredientUse(requirement, matched, usedUniqueItems);
+            matched.shrink(1);
+            if (matched.isEmpty())
+            {
+                available.remove(matchIndex);
             }
         }
 
@@ -429,6 +486,31 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             {
                 return false;
             }
+        }
+
+        return true;
+    }
+
+    private static boolean removeCraftingIngredientRequirements(
+        final List<CraftingIngredientRequirement> requirements,
+        final IItemHandler warehouseInventory,
+        final IItemHandler playerInventory,
+        final boolean includePlayerInventory)
+    {
+        final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems = new HashMap<>();
+        for (final CraftingIngredientRequirement requirement : requirements)
+        {
+            if (removeMatchingIngredient(warehouseInventory, requirement, usedUniqueItems))
+            {
+                continue;
+            }
+
+            if (includePlayerInventory && removeMatchingIngredient(playerInventory, requirement, usedUniqueItems))
+            {
+                continue;
+            }
+
+            return false;
         }
 
         return true;
@@ -543,6 +625,203 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         }
 
         return remaining;
+    }
+
+    private static List<ItemStack> snapshotInventory(final IItemHandler inventory)
+    {
+        final List<ItemStack> snapshot = new ArrayList<>();
+        for (int slot = 0; slot < inventory.getSlots(); slot++)
+        {
+            final ItemStack stack = inventory.getStackInSlot(slot);
+            if (!stack.isEmpty())
+            {
+                snapshot.add(stack.copy());
+            }
+        }
+
+        return snapshot;
+    }
+
+    /**
+     * Finds the index of a matching stack in the given list of available stacks.
+     * If the requirement has a preferred stack, the method will first try to find a stack
+     * that matches the preferred stack. If no matching stack is found, the method will
+     * then try to find a stack that matches the given ingredient.
+     *
+     * @param available the list of available stacks to search
+     * @param requirement the requirement to search for
+     * @return the index of the matching stack, or -1 if no matching stack is found
+     */
+    @SuppressWarnings("null")
+    private static int findMatchingStackIndex(
+        final List<ItemStack> available,
+        final CraftingIngredientRequirement requirement,
+        final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems)
+    {
+        for (int i = 0; i < available.size(); i++)
+        {
+            final ItemStack stack = available.get(i);
+            if (ItemStack.isSameItemSameComponents(stack, requirement.preferredStack()) && canUseUniqueIngredient(requirement, stack, usedUniqueItems))
+            {
+                return i;
+            }
+        }
+
+        for (int i = 0; i < available.size(); i++)
+        {
+            final ItemStack stack = available.get(i);
+            if (requirement.ingredient().test(stack) && canUseUniqueIngredient(requirement, stack, usedUniqueItems))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Removes a matching ingredient from the given inventory.
+     * If the requirement has a preferred stack, the method will first try to remove the preferred stack.
+     * If the preferred stack is not found, the method will then try to remove a stack that matches the given ingredient.
+     * If the preferred stack is found and has a count of 1, the method will return true.
+     * If the fallback stack is found and has a count of 1, the method will return true.
+     * If neither the preferred stack nor the fallback stack is found, the method will return false.
+     *
+     * @param inventory the inventory to remove the matching ingredient from
+     * @param requirement the requirement to remove a matching ingredient for
+     * @return true if a matching ingredient was removed, false otherwise
+     */
+    private static boolean removeMatchingIngredient(
+        final IItemHandler inventory,
+        final CraftingIngredientRequirement requirement,
+        final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems)
+    {
+        ItemStack preferredStack = requirement.preferredStack();
+
+        if (preferredStack == null || preferredStack.isEmpty())
+        {
+            return false;
+        }   
+
+        final int preferredSlot = findMatchingInventorySlot(inventory, requirement, usedUniqueItems, false);
+        if (preferredSlot >= 0)
+        {
+            final ItemStack extracted = inventory.extractItem(preferredSlot, 1, false);
+            if (extracted.getCount() == 1)
+            {
+                markUniqueIngredientUse(requirement, extracted, usedUniqueItems);
+                return true;
+            }
+        }
+
+        final int fallbackSlot = findMatchingInventorySlot(inventory, requirement, usedUniqueItems, true);
+        if (fallbackSlot < 0)
+        {
+            return false;
+        }
+
+        final ItemStack extracted = inventory.extractItem(fallbackSlot, 1, false);
+        if (extracted.getCount() == 1)
+        {
+            markUniqueIngredientUse(requirement, extracted, usedUniqueItems);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static int findMatchingInventorySlot(
+        final IItemHandler inventory,
+        final CraftingIngredientRequirement requirement,
+        final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems,
+        final boolean ingredientFallback)
+    {
+        for (int slot = 0; slot < inventory.getSlots(); slot++)
+        {
+            final ItemStack stack = inventory.getStackInSlot(slot);
+            if (stack.isEmpty())
+            {
+                continue;
+            }
+
+            final ItemStack preferredStack = requirement.preferredStack();
+            if (preferredStack == null)
+            {
+                continue;
+            }
+
+            if (!ingredientFallback
+                && ItemStack.isSameItemSameComponents(stack, preferredStack)
+                && canUseUniqueIngredient(requirement, stack, usedUniqueItems))
+            {
+                return slot;
+            }
+
+            if (ingredientFallback
+                && requirement.ingredient().test(stack)
+                && canUseUniqueIngredient(requirement, stack, usedUniqueItems))
+            {
+                return slot;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Checks if the given ItemStack can be used to fulfill the given crafting ingredient requirement,
+     * taking into account the unique group of the requirement and the items that have already been used.
+     * If the requirement does not have a unique group, this method will always return true.
+     *
+     * @param requirement the crafting ingredient requirement to check
+     * @param stack the ItemStack to check
+     * @param usedUniqueItems a map of unique groups to the items that have already been used
+     * @return true if the ItemStack can be used, false otherwise
+     */
+    @SuppressWarnings("null")
+    private static boolean canUseUniqueIngredient(
+        final CraftingIngredientRequirement requirement,
+        final ItemStack stack,
+        final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems)
+    {
+        if (requirement.uniqueGroup() == null)
+        {
+            return true;
+        }
+
+        final ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        return itemId != null && !usedUniqueItems.getOrDefault(requirement.uniqueGroup(), Set.of()).contains(itemId);
+    }
+
+    /**
+     * Marks the given ItemStack as used to fulfill the given crafting ingredient requirement,
+     * so that it cannot be used again to fulfill the same requirement.
+     * If the requirement does not have a unique group, this method will do nothing.
+     *
+     * @param requirement the crafting ingredient requirement to mark the item stack as used for
+     * @param stack the ItemStack to mark as used
+     * @param usedUniqueItems a map of unique groups to the items that have already been used
+     */
+    private static void markUniqueIngredientUse(
+        final CraftingIngredientRequirement requirement,
+        final ItemStack stack,
+        final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems)
+    {
+        if (requirement.uniqueGroup() == null)
+        {
+            return;
+        }
+
+        @SuppressWarnings("null")
+        final ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
+        if (itemId != null)
+        {
+            usedUniqueItems.computeIfAbsent(requirement.uniqueGroup(), ignored -> new HashSet<>()).add(itemId);
+        }
+    }
+
+    private record CraftingIngredientRequirement(Ingredient ingredient, ItemStack preferredStack, ResourceLocation uniqueGroup)
+    {
     }
 
     private static Component getMissingStatusText(final boolean includePlayerInventory)
