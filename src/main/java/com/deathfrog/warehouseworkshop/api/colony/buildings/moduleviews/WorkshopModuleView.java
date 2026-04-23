@@ -19,8 +19,7 @@ public class WorkshopModuleView  extends AbstractBuildingModuleView
     @Override
     public void deserialize(@NotNull RegistryFriendlyByteBuf arg0)
     {
-        outputTarget = OutputTarget.byId(arg0.readInt());
-        includePlayerInventory = arg0.readBoolean();
+        // Authoritative workshop settings are delivered per-player after the window opens.
     }
 
     @Override

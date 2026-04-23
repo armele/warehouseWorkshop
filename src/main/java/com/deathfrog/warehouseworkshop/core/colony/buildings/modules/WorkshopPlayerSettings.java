@@ -2,7 +2,6 @@ package com.deathfrog.warehouseworkshop.core.colony.buildings.modules;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-
 import com.deathfrog.warehouseworkshop.WarehouseWorkshopMod;
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
 
@@ -12,8 +11,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * Stores workshop settings per player and per building, while lazily migrating
- * legacy module-level defaults for upgraded worlds.
+ * Stores workshop settings per player and per building.
  */
 public record WorkshopPlayerSettings(OutputTarget outputTarget, boolean includePlayerInventory)
 {
@@ -29,15 +27,13 @@ public record WorkshopPlayerSettings(OutputTarget outputTarget, boolean includeP
      * Retrieves the workshop settings for the given player and building position.
      *
      * If the settings have been previously stored, they are returned directly.
-     * Otherwise, the method attempts to migrate the legacy module-level defaults
-     * for the given building, and saves the migrated settings before returning them.
+     * Otherwise, the current defaults are saved and returned.
      *
      * @param player the player to retrieve the settings for
      * @param buildingPos the position of the building to retrieve the settings for
-     * @param legacyModule the legacy module to migrate the settings from, or null if no migration is needed
-     * @return the retrieved or migrated workshop settings
+     * @return the retrieved workshop settings
      */
-    public static WorkshopPlayerSettings get(final Player player, final BlockPos buildingPos, @Nullable final WorkshopModule legacyModule)
+    public static WorkshopPlayerSettings get(final Player player, final BlockPos buildingPos)
     {
         final CompoundTag entry = getSettingsEntry(player, buildingPos, false);
         if (entry != null)
@@ -45,11 +41,8 @@ public record WorkshopPlayerSettings(OutputTarget outputTarget, boolean includeP
             return fromTag(entry);
         }
 
-        final WorkshopPlayerSettings migrated = legacyModule == null
-            ? DEFAULT
-            : new WorkshopPlayerSettings(legacyModule.getOutputTarget(), legacyModule.shouldIncludePlayerInventory());
-        save(player, buildingPos, migrated);
-        return migrated;
+        save(player, buildingPos, DEFAULT);
+        return DEFAULT;
     }
 
     /**

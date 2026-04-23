@@ -4,19 +4,12 @@ import com.minecolonies.api.colony.buildings.modules.AbstractBuildingModule;
 import com.minecolonies.api.colony.buildings.modules.IPersistentModule;
 
 import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 
 import org.jetbrains.annotations.NotNull;
 
 public class WorkshopModule extends AbstractBuildingModule implements IPersistentModule
 {
-    private static final String TAG_OUTPUT_TARGET = "outputTarget";
-    private static final String TAG_INCLUDE_PLAYER_INVENTORY = "includePlayerInventory";
-
-    private OutputTarget outputTarget = OutputTarget.PLAYER_INVENTORY;
-    private boolean includePlayerInventory = false;
-
     /**
      * Create a new module.
      *
@@ -28,59 +21,21 @@ public class WorkshopModule extends AbstractBuildingModule implements IPersisten
     }
 
     @Override
-    public void deserializeNBT(@NotNull final HolderLookup.Provider provider, final CompoundTag compound)
+    public void deserializeNBT(@NotNull final HolderLookup.Provider provider, final net.minecraft.nbt.CompoundTag compound)
     {
-        if (compound.contains(TAG_OUTPUT_TARGET))
-        {
-            outputTarget = OutputTarget.byId(compound.getInt(TAG_OUTPUT_TARGET));
-        }
-
-        if (compound.contains(TAG_INCLUDE_PLAYER_INVENTORY))
-        {
-            includePlayerInventory = compound.getBoolean(TAG_INCLUDE_PLAYER_INVENTORY);
-        }
+        // Per-player workshop settings are stored on the player, not the building module.
     }
 
     @Override
-    public void serializeNBT(@NotNull final HolderLookup.Provider provider, final CompoundTag compound)
+    public void serializeNBT(@NotNull final HolderLookup.Provider provider, final net.minecraft.nbt.CompoundTag compound)
     {
-        compound.putInt(TAG_OUTPUT_TARGET, outputTarget.id);
-        compound.putBoolean(TAG_INCLUDE_PLAYER_INVENTORY, includePlayerInventory);
+        // Legacy module-scoped workshop settings are intentionally no longer persisted.
     }
 
     @Override
     public void serializeToView(@NotNull final RegistryFriendlyByteBuf buf)
     {
-        buf.writeInt(outputTarget.id);
-        buf.writeBoolean(includePlayerInventory);
-    }
-
-    public OutputTarget getOutputTarget()
-    {
-        return outputTarget;
-    }
-
-    public void setOutputTarget(final OutputTarget outputTarget)
-    {
-        if (this.outputTarget != outputTarget)
-        {
-            this.outputTarget = outputTarget;
-            markDirty();
-        }
-    }
-
-    public boolean shouldIncludePlayerInventory()
-    {
-        return includePlayerInventory;
-    }
-
-    public void setIncludePlayerInventory(final boolean includePlayerInventory)
-    {
-        if (this.includePlayerInventory != includePlayerInventory)
-        {
-            this.includePlayerInventory = includePlayerInventory;
-            markDirty();
-        }
+        // The client receives authoritative per-player settings via a dedicated packet.
     }
 
     public enum OutputTarget

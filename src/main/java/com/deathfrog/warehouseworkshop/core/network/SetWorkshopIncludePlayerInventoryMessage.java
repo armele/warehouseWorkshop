@@ -60,7 +60,7 @@ public record SetWorkshopIncludePlayerInventoryMessage(BlockPos buildingPos, boo
         final WorkshopModule module = building.getModule(WorkshopModule.class, candidate -> true);
         if (module != null)
         {
-            final WorkshopPlayerSettings currentSettings = WorkshopPlayerSettings.get(player, buildingPos, module);
+            final WorkshopPlayerSettings currentSettings = WorkshopPlayerSettings.get(player, buildingPos);
             WorkshopPlayerSettings.save(player, buildingPos, new WorkshopPlayerSettings(currentSettings.outputTarget(), includePlayerInventory));
         }
     }

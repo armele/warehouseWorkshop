@@ -159,7 +159,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         }
 
         final List<CraftingIngredientRequirement> requiredIngredients = buildCraftingIngredientRequirements(recipe.get().value(), normalizedGrid);
-        final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos, module);
+        final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos);
         final boolean includePlayerInventory = settings.includePlayerInventory();
         final IItemHandler warehouseInventory = building.getItemHandlerCap();
         final IItemHandler playerInventory = new PlayerMainInvWrapper(player.getInventory());
@@ -254,7 +254,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             return;
         }
 
-        final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos, module);
+        final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos);
         final boolean includePlayerInventory = settings.includePlayerInventory();
         final IItemHandler warehouseInventory = building.getItemHandlerCap();
         final IItemHandler playerInventory = new PlayerMainInvWrapper(player.getInventory());

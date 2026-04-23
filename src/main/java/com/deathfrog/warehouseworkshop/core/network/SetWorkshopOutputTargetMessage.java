@@ -61,7 +61,7 @@ public record SetWorkshopOutputTargetMessage(BlockPos buildingPos, int outputTar
         final WorkshopModule module = building.getModule(WorkshopModule.class, candidate -> true);
         if (module != null)
         {
-            final WorkshopPlayerSettings currentSettings = WorkshopPlayerSettings.get(player, buildingPos, module);
+            final WorkshopPlayerSettings currentSettings = WorkshopPlayerSettings.get(player, buildingPos);
             WorkshopPlayerSettings.save(player, buildingPos, new WorkshopPlayerSettings(OutputTarget.byId(outputTargetId), currentSettings.includePlayerInventory()));
         }
     }

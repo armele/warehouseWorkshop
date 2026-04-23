@@ -61,7 +61,7 @@ public record RequestWorkshopSettingsMessage(BlockPos buildingPos) implements IS
             return;
         }
 
-        final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos, module);
+        final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos);
         ClientboundWorkshopSettingsMessage.sendToPlayer(serverPlayer, buildingPos, settings);
     }
 }
