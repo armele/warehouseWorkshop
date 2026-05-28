@@ -31,6 +31,7 @@ import com.ldtteam.blockui.controls.Gradient;
 import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
 import com.ldtteam.blockui.controls.TextField;
+import com.ldtteam.blockui.controls.Tooltip;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlock;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlockComponent;
 import com.ldtteam.domumornamentum.client.model.data.MaterialTextureData;
@@ -47,6 +48,7 @@ import com.minecolonies.core.client.gui.AbstractModuleWindow;
 import com.minecolonies.core.tileentities.TileEntityRack;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -84,10 +86,21 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private static final int MISSING_SLOT_RED = 180;
     private static final int MISSING_SLOT_GREEN = 48;
     private static final int MISSING_SLOT_BLUE = 48;
+    private static final int LIMITED_SLOT_RED = 220;
+    private static final int LIMITED_SLOT_GREEN = 180;
+    private static final int LIMITED_SLOT_BLUE = 32;
+    private static final int PRESENT_SLOT_ICON_COLOR = 0x30A040;
+    private static final int LIMITED_SLOT_ICON_COLOR = 0xDCA000;
+    private static final int MISSING_SLOT_ICON_COLOR = 0xB43030;
+    private static final String PRESENT_SLOT_ICON = "\u2713";
+    private static final String LIMITED_SLOT_ICON = "!";
+    private static final String MISSING_SLOT_ICON = "X";
     private static final String DEFAULT_CRAFT_AMOUNT = "1";
 
     private final List<Gradient> gridBackgrounds = new ArrayList<>(GRID_SIZE);
     private final List<ItemIcon> gridIcons = new ArrayList<>(GRID_SIZE);
+    private final List<Text> gridStatusIcons = new ArrayList<>(GRID_SIZE);
+    private final List<Tooltip> gridStatusTooltips = new ArrayList<>(GRID_SIZE);
     private final List<Button> gridButtons = new ArrayList<>(GRID_SIZE);
     private final List<ItemStack> selectedGrid = new ArrayList<>(Collections.nCopies(GRID_SIZE, ItemStack.EMPTY));
     private final List<ItemStack> displayGrid = new ArrayList<>(Collections.nCopies(GRID_SIZE, ItemStack.EMPTY));
@@ -126,7 +139,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             final int slot = i;
             gridBackgrounds.add(window.findPaneOfTypeByID("gridBackground" + i, Gradient.class));
             gridIcons.add(window.findPaneOfTypeByID("gridIcon" + i, ItemIcon.class));
-            gridButtons.add(window.findPaneOfTypeByID("gridButton" + i, Button.class));
+            final Text gridStatusIcon = window.findPaneOfTypeByID("gridStatusIcon" + i, Text.class);
+            gridStatusIcons.add(gridStatusIcon);
+            final Button gridButton = window.findPaneOfTypeByID("gridButton" + i, Button.class);
+            gridButtons.add(gridButton);
+            gridStatusTooltips.add(PaneBuilders.tooltipBuilder().hoverPane(gridStatusIcon).build());
             registerButton("gridButton" + i, () -> setActiveSlot(slot));
         }
 
@@ -210,6 +227,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
         EMPTY,
         PRESENT,
+        LIMITED,
         MISSING
     }
 
@@ -237,6 +255,19 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             final ItemStack outputCopy = output.copy();
             outputCopy.setCount(Math.max(1, outputCopy.getCount()));
             return new WorkshopRecipe(RecipeKind.DOMUM, recipe.id(), outputCopy, null, recipe);
+        }
+    }
+
+    private record CraftCapacity(int requestedCrafts, int supportedCrafts, Set<ItemStorage> limitingIngredients)
+    {
+        static CraftCapacity none()
+        {
+            return new CraftCapacity(0, 0, Set.of());
+        }
+
+        boolean isPartial()
+        {
+            return supportedCrafts > 0 && supportedCrafts < requestedCrafts && !limitingIngredients.isEmpty();
         }
     }
 
@@ -364,9 +395,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         this.requestOutputs.addAll(extractRequestedOutputs(request));
         refreshPlayerInventoryStock();
         this.matchingRecipes.addAll(findMatchingRecipes(this.requestOutputs, false));
-        this.selectedRecipeIndex = this.matchingRecipes.isEmpty() ? -1 : 0;
         populateCraftAmountFromRequest();
-        applySelectedRecipe();
+        selectFirstCraftableRecipe();
     }
 
     /**
@@ -391,8 +421,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         outputLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.search_item"));
         this.matchingRecipes.clear();
         this.matchingRecipes.addAll(findMatchingRecipes(List.of(output), false));
-        this.selectedRecipeIndex = this.matchingRecipes.isEmpty() ? -1 : 0;
-        applySelectedRecipe();
+        selectFirstCraftableRecipe();
     }
 
     /**
@@ -441,6 +470,29 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         selectedRecipeIndex = (selectedRecipeIndex + 1) % matchingRecipes.size();
+        applySelectedRecipe();
+    }
+
+    private void selectFirstCraftableRecipe()
+    {
+        if (matchingRecipes.isEmpty())
+        {
+            selectedRecipeIndex = -1;
+            applySelectedRecipe();
+            return;
+        }
+
+        for (int i = 0; i < matchingRecipes.size(); i++)
+        {
+            selectedRecipeIndex = i;
+            applySelectedRecipe();
+            if (isGridCraftable())
+            {
+                return;
+            }
+        }
+
+        selectedRecipeIndex = 0;
         applySelectedRecipe();
     }
 
@@ -679,7 +731,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void craft()
     {
-        performCraft(1);
+        performCraft(1, 0);
     }
 
     private void craftAll()
@@ -693,14 +745,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return;
         }
 
-        performCraft(craftCount);
+        performCraft(craftCount, getCraftAmount());
     }
 
     /**
      * Sends a craft request to the server to perform a workshop craft.
      * @param craftCount The number of times to craft the active recipe.
+     * @param requestedOutputCount The total requested output count for craft-all status reporting.
      */
-    private void performCraft(final int craftCount)
+    private void performCraft(final int craftCount, final int requestedOutputCount)
     {
         if (!playerSettingsLoaded)
         {
@@ -727,7 +780,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return;
         }
 
-        new WorkshopCraftMessage(buildingView.getPosition(), List.copyOf(selectedGrid), craftCount, activeRecipe.kind().networkId, activeRecipe.id()).sendToServer();
+        new WorkshopCraftMessage(buildingView.getPosition(), List.copyOf(selectedGrid), craftCount, requestedOutputCount, activeRecipe.kind().networkId, activeRecipe.id()).sendToServer();
         setStatusText(Component.translatable(
             craftCount == 1
                 ? "com.warehouseworkshop.core.gui.workshop.status.sent"
@@ -788,28 +841,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      */
     private int getCraftAllCount()
     {
-        final WorkshopRecipe selectedRecipe = getActiveRecipe();
-        if (selectedRecipe == null)
-        {
-            return 0;
-        }
-
-        final Level level = Minecraft.getInstance().level;
-        if (level == null)
-        {
-            return 0;
-        }
-
-        final ItemStack recipeOutput = getCurrentGridOutput();
-        final int requestedOutputCount = getCraftAmount();
-        if (requestedOutputCount <= 0)
-        {
-            return 0;
-        }
-
-        final int requestedCrafts = getRequestedCraftCount(recipeOutput, requestedOutputCount);
-        final int supportedCrafts = getSupportedCraftCount(requestedCrafts);
-        return requestedCrafts <= 0 ? 0 : Math.min(requestedCrafts, supportedCrafts);
+        final CraftCapacity capacity = getCraftCapacity();
+        return capacity.requestedCrafts() <= 0 ? 0 : Math.min(capacity.requestedCrafts(), capacity.supportedCrafts());
     }
 
     /**
@@ -926,8 +959,38 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      * 
      * @return The maximum number of crafts that can be performed.
      */
+    private CraftCapacity getCraftCapacity()
+    {
+        final WorkshopRecipe selectedRecipe = getActiveRecipe();
+        if (selectedRecipe == null)
+        {
+            return CraftCapacity.none();
+        }
+
+        final Level level = Minecraft.getInstance().level;
+        if (level == null)
+        {
+            return CraftCapacity.none();
+        }
+
+        final ItemStack recipeOutput = getCurrentGridOutput();
+        final int requestedOutputCount = getCraftAmount();
+        if (requestedOutputCount <= 0)
+        {
+            return CraftCapacity.none();
+        }
+
+        final int requestedCrafts = getRequestedCraftCount(recipeOutput, requestedOutputCount);
+        if (requestedCrafts <= 0)
+        {
+            return CraftCapacity.none();
+        }
+
+        return getCraftCapacity(requestedCrafts);
+    }
+
     @SuppressWarnings("null")
-    private int getSupportedCraftCount(final int requestedCrafts)
+    private CraftCapacity getCraftCapacity(final int requestedCrafts)
     {
         final Map<ItemStorage, Integer> requiredPerCraft = new HashMap<>();
         for (final ItemStack stack : selectedGrid)
@@ -940,26 +1003,26 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         if (requiredPerCraft.isEmpty())
         {
-            return 0;
+            return CraftCapacity.none();
         }
 
         final WorkshopRecipe activeRecipe = getActiveRecipe();
         final Level level = Minecraft.getInstance().level;
         if (activeRecipe == null || activeRecipe.kind() != RecipeKind.CRAFTING || level == null)
         {
-            return getBasicSupportedCraftCount(requiredPerCraft);
+            return getBasicCraftCapacity(requestedCrafts, requiredPerCraft);
         }
 
         final RecipeHolder<CraftingRecipe> currentRecipe = getCurrentGridRecipe();
         if (currentRecipe == null)
         {
-            return getBasicSupportedCraftCount(requiredPerCraft);
+            return getBasicCraftCapacity(requestedCrafts, requiredPerCraft);
         }
 
         final CraftingInput input = CraftingInput.of(3, 3, List.copyOf(selectedGrid));
         if (input == null || input.isEmpty())
         {
-            return 0;
+            return CraftCapacity.none();
         }
 
         final List<ItemStack> remainingItems = currentRecipe.value().getRemainingItems(input);
@@ -991,7 +1054,10 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             }
         }
 
-        return supportedCrafts;
+        final Set<ItemStorage> limitingIngredients = supportedCrafts > 0 && supportedCrafts < requestedCrafts
+            ? getLimitingIngredients(requiredPerCraft, remainingWarehouseStock, remainingPlayerStock, includePlayerInventory)
+            : Set.of();
+        return new CraftCapacity(requestedCrafts, supportedCrafts, limitingIngredients);
     }
 
     /**
@@ -1011,6 +1077,46 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         return supportedCrafts == Integer.MAX_VALUE ? 0 : supportedCrafts;
+    }
+
+    private CraftCapacity getBasicCraftCapacity(final int requestedCrafts, final Map<ItemStorage, Integer> requiredPerCraft)
+    {
+        final int supportedCrafts = getBasicSupportedCraftCount(requiredPerCraft);
+        if (supportedCrafts <= 0 || supportedCrafts >= requestedCrafts)
+        {
+            return new CraftCapacity(requestedCrafts, supportedCrafts, Set.of());
+        }
+
+        final Set<ItemStorage> limitingIngredients = new HashSet<>();
+        for (final Map.Entry<ItemStorage, Integer> entry : requiredPerCraft.entrySet())
+        {
+            if (getAvailableIngredientCount(entry.getKey()) - (entry.getValue() * supportedCrafts) < entry.getValue())
+            {
+                limitingIngredients.add(entry.getKey());
+            }
+        }
+
+        return new CraftCapacity(requestedCrafts, supportedCrafts, limitingIngredients);
+    }
+
+    private Set<ItemStorage> getLimitingIngredients(
+        final Map<ItemStorage, Integer> requiredPerCraft,
+        final Map<ItemStorage, Integer> remainingWarehouseStock,
+        final Map<ItemStorage, Integer> remainingPlayerStock,
+        final boolean includePlayerInventory)
+    {
+        final Set<ItemStorage> limitingIngredients = new HashSet<>();
+        for (final Map.Entry<ItemStorage, Integer> entry : requiredPerCraft.entrySet())
+        {
+            final int available = getStockCount(remainingWarehouseStock, entry.getKey())
+                + (includePlayerInventory ? getStockCount(remainingPlayerStock, entry.getKey()) : 0);
+            if (available < entry.getValue())
+            {
+                limitingIngredients.add(entry.getKey());
+            }
+        }
+
+        return limitingIngredients;
     }
 
     /**
@@ -2145,6 +2251,8 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
     private void updateCraftButtons()
     {
+        updatePartialCraftHighlights();
+        updateGridBackgrounds();
         final boolean craftable = playerSettingsLoaded && isGridCraftable();
         craftButton.setEnabled(craftable);
         craftAllButton.setEnabled(craftable && hasValidCraftAmount());
@@ -2252,6 +2360,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
         final boolean domumRecipe = selectedRecipe != null && selectedRecipe.kind() == RecipeKind.DOMUM;
+        updatePartialCraftHighlights();
         for (int i = 0; i < GRID_SIZE; i++)
         {
             gridIcons.get(i).setItem(displayGrid.get(i));
@@ -2260,6 +2369,63 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         updateRequestDetails();
+    }
+
+    private void updatePartialCraftHighlights()
+    {
+        for (int i = 0; i < GRID_SIZE; i++)
+        {
+            if (slotStates.get(i) == SlotState.LIMITED)
+            {
+                slotStates.set(i, SlotState.PRESENT);
+            }
+        }
+
+        if (!playerSettingsLoaded || !hasValidCraftAmount() || !isGridCraftable())
+        {
+            return;
+        }
+
+        final CraftCapacity capacity = getCraftCapacity();
+        if (!capacity.isPartial())
+        {
+            return;
+        }
+
+        for (int i = 0; i < GRID_SIZE; i++)
+        {
+            if (slotStates.get(i) == SlotState.PRESENT && isLimitingIngredient(selectedGrid.get(i), capacity.limitingIngredients()))
+            {
+                slotStates.set(i, SlotState.LIMITED);
+            }
+        }
+    }
+
+    private boolean isLimitingIngredient(final ItemStack stack, final Set<ItemStorage> limitingIngredients)
+    {
+        if (stack.isEmpty())
+        {
+            return false;
+        }
+
+        final ItemStorage ingredient = new ItemStorage(stack.copy());
+        for (final ItemStorage limitingIngredient : limitingIngredients)
+        {
+            if (Objects.equals(limitingIngredient, ingredient))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void updateGridBackgrounds()
+    {
+        for (int i = 0; i < GRID_SIZE; i++)
+        {
+            updateGridBackground(i);
+        }
     }
 
     /**
@@ -2271,11 +2437,17 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private void updateGridBackground(final int slot)
     {
         final Gradient background = gridBackgrounds.get(slot);
+        updateGridStatusIndicator(slot);
         switch (slotStates.get(slot))
         {
             case PRESENT:
                 background.setGradientStart(PRESENT_SLOT_RED, PRESENT_SLOT_GREEN, PRESENT_SLOT_BLUE, SLOT_BACKGROUND_ALPHA);
                 background.setGradientEnd(PRESENT_SLOT_RED, PRESENT_SLOT_GREEN, PRESENT_SLOT_BLUE, SLOT_BACKGROUND_ALPHA);
+                background.show();
+                break;
+            case LIMITED:
+                background.setGradientStart(LIMITED_SLOT_RED, LIMITED_SLOT_GREEN, LIMITED_SLOT_BLUE, SLOT_BACKGROUND_ALPHA);
+                background.setGradientEnd(LIMITED_SLOT_RED, LIMITED_SLOT_GREEN, LIMITED_SLOT_BLUE, SLOT_BACKGROUND_ALPHA);
                 background.show();
                 break;
             case MISSING:
@@ -2287,5 +2459,47 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                 background.hide();
                 break;
         }
+    }
+
+    private void updateGridStatusIndicator(final int slot)
+    {
+        final Text statusIcon = gridStatusIcons.get(slot);
+        final Tooltip tooltip = gridStatusTooltips.get(slot);
+        switch (slotStates.get(slot))
+        {
+            case PRESENT:
+                statusIcon.setText(Component.literal(PRESENT_SLOT_ICON).withStyle(ChatFormatting.BOLD));
+                setStatusIconColor(statusIcon, PRESENT_SLOT_ICON_COLOR);
+                statusIcon.show();
+                tooltip.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.slot_status.present"));
+                tooltip.hide();
+                break;
+            case LIMITED:
+                statusIcon.setText(Component.literal(LIMITED_SLOT_ICON).withStyle(ChatFormatting.BOLD));
+                setStatusIconColor(statusIcon, LIMITED_SLOT_ICON_COLOR);
+                statusIcon.show();
+                tooltip.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.slot_status.limited"));
+                tooltip.hide();
+                break;
+            case MISSING:
+                statusIcon.setText(Component.literal(MISSING_SLOT_ICON).withStyle(ChatFormatting.BOLD));
+                setStatusIconColor(statusIcon, MISSING_SLOT_ICON_COLOR);
+                statusIcon.show();
+                tooltip.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.slot_status.missing"));
+                tooltip.hide();
+                break;
+            default:
+                statusIcon.hide();
+                tooltip.clearText();
+                tooltip.hide();
+                break;
+        }
+    }
+
+    private void setStatusIconColor(final Text statusIcon, final int color)
+    {
+        statusIcon.setTextColor(color);
+        statusIcon.setTextHoverColor(color);
+        statusIcon.setTextDisabledColor(color);
     }
 }

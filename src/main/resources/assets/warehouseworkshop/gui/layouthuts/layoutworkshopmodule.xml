@@ -6,37 +6,46 @@
            label="$(com.warehouseworkshop.core.gui.workshop.title)"/>
 
     <box pos="12 28" size="78 78" linewidth="1"/>
-    <text size="58 10" pos="20 31" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.recipe)"/>
 
-    <itemicon id="gridIcon0" size="18 18" pos="20 44"/>
-    <itemicon id="gridIcon1" size="18 18" pos="38 44"/>
-    <itemicon id="gridIcon2" size="18 18" pos="56 44"/>
-    <itemicon id="gridIcon3" size="18 18" pos="20 62"/>
-    <itemicon id="gridIcon4" size="18 18" pos="38 62"/>
-    <itemicon id="gridIcon5" size="18 18" pos="56 62"/>
-    <itemicon id="gridIcon6" size="18 18" pos="20 80"/>
-    <itemicon id="gridIcon7" size="18 18" pos="38 80"/>
-    <itemicon id="gridIcon8" size="18 18" pos="56 80"/>
+    <itemicon id="gridIcon0" size="18 18" pos="17 31"/>
+    <itemicon id="gridIcon1" size="18 18" pos="42 31"/>
+    <itemicon id="gridIcon2" size="18 18" pos="67 31"/>
+    <itemicon id="gridIcon3" size="18 18" pos="17 55"/>
+    <itemicon id="gridIcon4" size="18 18" pos="42 55"/>
+    <itemicon id="gridIcon5" size="18 18" pos="67 55"/>
+    <itemicon id="gridIcon6" size="18 18" pos="17 79"/>
+    <itemicon id="gridIcon7" size="18 18" pos="42 79"/>
+    <itemicon id="gridIcon8" size="18 18" pos="67 79"/>
 
-    <button id="gridButton0" size="18 18" pos="20 44" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton1" size="18 18" pos="38 44" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton2" size="18 18" pos="56 44" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton3" size="18 18" pos="20 62" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton4" size="18 18" pos="38 62" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton5" size="18 18" pos="56 62" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton6" size="18 18" pos="20 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton7" size="18 18" pos="38 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton8" size="18 18" pos="56 80" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton0" size="18 18" pos="17 31" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton1" size="18 18" pos="42 31" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton2" size="18 18" pos="67 31" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton3" size="18 18" pos="17 55" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton4" size="18 18" pos="42 55" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton5" size="18 18" pos="67 55" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton6" size="18 18" pos="17 79" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton7" size="18 18" pos="42 79" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton8" size="18 18" pos="67 79" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
 
-    <gradient id="gridBackground0" size="18 18" pos="20 44" visible="false" enabled="false"/>
-    <gradient id="gridBackground1" size="18 18" pos="38 44" visible="false" enabled="false"/>
-    <gradient id="gridBackground2" size="18 18" pos="56 44" visible="false" enabled="false"/>
-    <gradient id="gridBackground3" size="18 18" pos="20 62" visible="false" enabled="false"/>
-    <gradient id="gridBackground4" size="18 18" pos="38 62" visible="false" enabled="false"/>
-    <gradient id="gridBackground5" size="18 18" pos="56 62" visible="false" enabled="false"/>
-    <gradient id="gridBackground6" size="18 18" pos="20 80" visible="false" enabled="false"/>
-    <gradient id="gridBackground7" size="18 18" pos="38 80" visible="false" enabled="false"/>
-    <gradient id="gridBackground8" size="18 18" pos="56 80" visible="false" enabled="false"/>
+    <gradient id="gridBackground0" size="18 18" pos="17 31" visible="false" enabled="false"/>
+    <gradient id="gridBackground1" size="18 18" pos="42 31" visible="false" enabled="false"/>
+    <gradient id="gridBackground2" size="18 18" pos="67 31" visible="false" enabled="false"/>
+    <gradient id="gridBackground3" size="18 18" pos="17 55" visible="false" enabled="false"/>
+    <gradient id="gridBackground4" size="18 18" pos="42 55" visible="false" enabled="false"/>
+    <gradient id="gridBackground5" size="18 18" pos="67 55" visible="false" enabled="false"/>
+    <gradient id="gridBackground6" size="18 18" pos="17 79" visible="false" enabled="false"/>
+    <gradient id="gridBackground7" size="18 18" pos="42 79" visible="false" enabled="false"/>
+    <gradient id="gridBackground8" size="18 18" pos="67 79" visible="false" enabled="false"/>
+
+    <text id="gridStatusIcon0" size="8 8" pos="22 48" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon1" size="8 8" pos="47 48" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon2" size="8 8" pos="72 48" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon3" size="8 8" pos="22 72" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon4" size="8 8" pos="47 72" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon5" size="8 8" pos="72 72" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon6" size="8 8" pos="22 96" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon7" size="8 8" pos="47 96" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon8" size="8 8" pos="72 96" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
 
     <box pos="98 28" size="130 78" linewidth="1"/>
     <text id="recipeLabel" size="118 10" pos="104 31" textalign="MIDDLE" color="black"/>

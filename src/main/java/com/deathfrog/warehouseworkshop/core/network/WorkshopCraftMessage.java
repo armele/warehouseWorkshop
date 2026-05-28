@@ -51,7 +51,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * Performs a validated warehouse-backed craft on the server.
  */
-public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, int craftCount, int craftType, ResourceLocation recipeId) implements IServerboundPayload
+public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, int craftCount, int requestedOutputCount, int craftType, ResourceLocation recipeId) implements IServerboundPayload
 {
     public static final int CRAFT_TYPE_CRAFTING = 0;
     public static final int CRAFT_TYPE_DOMUM = 1;
@@ -67,6 +67,8 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         WorkshopCraftMessage::grid,
         ByteBufCodecs.INT,
         WorkshopCraftMessage::craftCount,
+        ByteBufCodecs.INT,
+        WorkshopCraftMessage::requestedOutputCount,
         ByteBufCodecs.INT,
         WorkshopCraftMessage::craftType,
         ResourceLocation.STREAM_CODEC,
@@ -202,7 +204,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             return;
         }
 
-        player.displayClientMessage(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.crafted", crafted), true);
+        player.displayClientMessage(getCraftedStatusText(crafted, craftedResult), true);
         sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
     }
 
@@ -291,8 +293,24 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             return;
         }
 
-        player.displayClientMessage(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.crafted", crafted), true);
+        player.displayClientMessage(getCraftedStatusText(crafted, craftedResult), true);
         sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
+    }
+
+    private Component getCraftedStatusText(final int crafted, final ItemStack craftedResult)
+    {
+        final int producedCount = crafted * Math.max(1, craftedResult.getCount());
+        if (requestedOutputCount <= 0)
+        {
+            return Component.translatable("com.warehouseworkshop.core.gui.workshop.status.crafted", crafted);
+        }
+
+        if (producedCount >= requestedOutputCount)
+        {
+            return Component.translatable("com.warehouseworkshop.core.gui.workshop.status.crafted.request_full", crafted, requestedOutputCount);
+        }
+
+        return Component.translatable("com.warehouseworkshop.core.gui.workshop.status.crafted.request_partial", crafted, producedCount, requestedOutputCount);
     }
 
     private void sendCraftingContentsSnapshot(
