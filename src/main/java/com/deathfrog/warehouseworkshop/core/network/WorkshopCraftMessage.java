@@ -42,7 +42,6 @@ import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeType;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.items.wrapper.PlayerMainInvWrapper;
@@ -153,14 +152,17 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         final List<ItemStack> normalizedGrid)
     {
         final CraftingInput input = CraftingInput.of(3, 3, normalizedGrid);
-        final Optional<RecipeHolder<CraftingRecipe>> recipe = player.level().getRecipeManager().getRecipeFor(RecipeType.CRAFTING, input, player.level());
-        if (recipe.isEmpty() || !recipe.get().id().equals(recipeId))
+        final Optional<RecipeHolder<?>> recipe = player.level().getRecipeManager().byKey(recipeId);
+        if (recipe.isEmpty()
+            || !recipe.get().id().equals(recipeId)
+            || !(recipe.get().value() instanceof final CraftingRecipe craftingRecipe)
+            || !craftingRecipe.matches(input, player.level()))
         {
             player.displayClientMessage(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.invalid"), true);
             return;
         }
 
-        final List<CraftingIngredientRequirement> requiredIngredients = buildCraftingIngredientRequirements(recipe.get().value(), normalizedGrid);
+        final List<CraftingIngredientRequirement> requiredIngredients = buildCraftingIngredientRequirements(craftingRecipe, normalizedGrid);
         final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos);
         final boolean includePlayerInventory = settings.includePlayerInventory();
         final IItemHandler warehouseInventory = building.getItemHandlerCap();
@@ -172,8 +174,8 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             return;
         }
 
-        final ItemStack craftedResult = recipe.get().value().assemble(input, player.level().registryAccess()).copy();
-        final List<ItemStack> remainingItems = recipe.get().value().getRemainingItems(input);
+        final ItemStack craftedResult = craftingRecipe.assemble(input, player.level().registryAccess()).copy();
+        final List<ItemStack> remainingItems = craftingRecipe.getRemainingItems(input);
         final OutputTarget outputTarget = settings.outputTarget();
         int crafted = 0;
 

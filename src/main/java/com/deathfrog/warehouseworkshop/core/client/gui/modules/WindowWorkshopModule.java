@@ -271,6 +271,10 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
     }
 
+    public record WorkshopTargetArea(int x, int y, int width, int height)
+    {
+    }
+
     @Override
     public void onOpened()
     {
@@ -720,6 +724,22 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         final WorkshopRecipe selectedRecipe = getSelectedRecipe();
         return selectedRecipe == null || selectedRecipe.kind() != RecipeKind.DOMUM || slot == DOMUM_FIRST_SLOT || slot == DOMUM_SECOND_SLOT;
+    }
+
+    public @Nullable WorkshopTargetArea getJeiIngredientTargetArea(final int slot)
+    {
+        if (slot < 0 || slot >= GRID_SIZE)
+        {
+            return null;
+        }
+
+        final Button gridButton = gridButtons.get(slot);
+        return new WorkshopTargetArea(gridButton.getX(), gridButton.getY(), gridButton.getWidth(), gridButton.getHeight());
+    }
+
+    public WorkshopTargetArea getJeiOutputTargetArea()
+    {
+        return new WorkshopTargetArea(requestIcon.getX(), requestIcon.getY(), requestIcon.getWidth(), requestIcon.getHeight());
     }
 
     private void clearGrid()
@@ -1283,6 +1303,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     @SuppressWarnings("null")
     private @Nullable RecipeHolder<CraftingRecipe> getCurrentGridRecipe()
     {
+        final WorkshopRecipe selectedRecipe = getSelectedRecipe();
+        if (selectedRecipe != null && selectedRecipe.kind() == RecipeKind.CRAFTING)
+        {
+            return getSelectedGridRecipe(selectedRecipe);
+        }
+
         final Level level = Minecraft.getInstance().level;
         if (level == null)
         {
@@ -1297,6 +1323,25 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         return level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, input, level).orElse(null);
+    }
+
+    @SuppressWarnings("null")
+    private @Nullable RecipeHolder<CraftingRecipe> getSelectedGridRecipe(final WorkshopRecipe selectedRecipe)
+    {
+        final RecipeHolder<CraftingRecipe> recipe = selectedRecipe.craftingRecipe();
+        final Level level = Minecraft.getInstance().level;
+        if (recipe == null || level == null)
+        {
+            return null;
+        }
+
+        final CraftingInput input = CraftingInput.of(3, 3, List.copyOf(selectedGrid));
+        if (input == null || input.isEmpty() || !recipe.value().matches(input, level))
+        {
+            return null;
+        }
+
+        return recipe;
     }
 
     /**
@@ -1314,6 +1359,19 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         if (selectedRecipe != null && selectedRecipe.kind() == RecipeKind.DOMUM)
         {
             return assembleDomumOutput(selectedRecipe);
+        }
+
+        if (selectedRecipe != null && selectedRecipe.kind() == RecipeKind.CRAFTING)
+        {
+            final RecipeHolder<CraftingRecipe> recipe = getSelectedGridRecipe(selectedRecipe);
+            final Level level = Minecraft.getInstance().level;
+            if (recipe == null || level == null)
+            {
+                return ItemStack.EMPTY;
+            }
+
+            final CraftingInput input = CraftingInput.of(3, 3, List.copyOf(selectedGrid));
+            return recipe.value().assemble(input, level.registryAccess()).copy();
         }
 
         final RecipeHolder<CraftingRecipe> currentRecipe = getCurrentGridRecipe();
@@ -2133,6 +2191,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         if ((selectedRecipe != null && selectedRecipe.kind() == RecipeKind.DOMUM) || level == null)
         {
             return selectedRecipe;
+        }
+
+        if (selectedRecipe != null && selectedRecipe.kind() == RecipeKind.CRAFTING)
+        {
+            return getSelectedGridRecipe(selectedRecipe) == null ? null : selectedRecipe;
         }
 
         final RecipeHolder<CraftingRecipe> currentRecipe = getCurrentGridRecipe();

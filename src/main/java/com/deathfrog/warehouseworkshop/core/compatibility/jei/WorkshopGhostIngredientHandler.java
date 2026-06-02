@@ -8,6 +8,7 @@ import javax.annotation.Nonnull;
 import org.jetbrains.annotations.NotNull;
 
 import com.deathfrog.warehouseworkshop.core.client.gui.modules.WindowWorkshopModule;
+import com.deathfrog.warehouseworkshop.core.client.gui.modules.WindowWorkshopModule.WorkshopTargetArea;
 import com.ldtteam.blockui.BOScreen;
 import com.ldtteam.blockui.views.BOWindow;
 
@@ -18,15 +19,7 @@ import net.minecraft.world.item.ItemStack;
 
 public class WorkshopGhostIngredientHandler implements IGhostIngredientHandler<BOScreen>
 {
-    private static final int[][] GRID_POSITIONS = {
-        {18, 44}, {36, 44}, {54, 44},
-        {18, 62}, {36, 62}, {54, 62},
-        {18, 80}, {36, 80}, {54, 80}
-    };
-
-    private static final int SLOT_SIZE = 18;
-    private static final int REQUEST_PREVIEW_X = 113;
-    private static final int REQUEST_PREVIEW_Y = 56;
+    private static final int GRID_SIZE = 9;
 
     /**
      * Retrieves a list of ghost ingredient targets for the given BO screen.
@@ -51,10 +44,11 @@ public class WorkshopGhostIngredientHandler implements IGhostIngredientHandler<B
         }
 
         final List<Target<I>> targets = new ArrayList<>();
-        for (int slot = 0; slot < GRID_POSITIONS.length; slot++)
+        for (int slot = 0; slot < GRID_SIZE; slot++)
         {
             final int targetSlot = slot;
-            if (!workshopWindow.canAcceptIngredientInSlot(targetSlot))
+            final WorkshopTargetArea targetArea = workshopWindow.getJeiIngredientTargetArea(targetSlot);
+            if (targetArea == null || !workshopWindow.canAcceptIngredientInSlot(targetSlot))
             {
                 continue;
             }
@@ -64,7 +58,7 @@ public class WorkshopGhostIngredientHandler implements IGhostIngredientHandler<B
                 @Override
                 public @NotNull Rect2i getArea()
                 {
-                    return getScaledArea(gui, GRID_POSITIONS[targetSlot][0], GRID_POSITIONS[targetSlot][1], SLOT_SIZE, SLOT_SIZE);
+                    return getScaledArea(gui, targetArea);
                 }
 
                 @Override
@@ -75,12 +69,13 @@ public class WorkshopGhostIngredientHandler implements IGhostIngredientHandler<B
             });
         }
 
+        final WorkshopTargetArea outputTargetArea = workshopWindow.getJeiOutputTargetArea();
         targets.add(new Target<>()
         {
             @Override
             public @NotNull Rect2i getArea()
             {
-                return getScaledArea(gui, REQUEST_PREVIEW_X, REQUEST_PREVIEW_Y, SLOT_SIZE, SLOT_SIZE);
+                return getScaledArea(gui, outputTargetArea);
             }
 
             @Override
@@ -98,13 +93,13 @@ public class WorkshopGhostIngredientHandler implements IGhostIngredientHandler<B
     {
     }
 
-    private static Rect2i getScaledArea(final BOScreen gui, final int logicalX, final int logicalY, final int logicalWidth, final int logicalHeight)
+    private static Rect2i getScaledArea(final BOScreen gui, final WorkshopTargetArea area)
     {
         final ScreenBounds bounds = ScreenBounds.of(gui);
-        final int x = bounds.guiLeft() + scale(bounds.scaleFactor(), logicalX);
-        final int y = bounds.guiTop() + scale(bounds.scaleFactor(), logicalY);
-        final int width = Math.max(1, scale(bounds.scaleFactor(), logicalWidth));
-        final int height = Math.max(1, scale(bounds.scaleFactor(), logicalHeight));
+        final int x = bounds.guiLeft() + scale(bounds.scaleFactor(), area.x());
+        final int y = bounds.guiTop() + scale(bounds.scaleFactor(), area.y());
+        final int width = Math.max(1, scale(bounds.scaleFactor(), area.width()));
+        final int height = Math.max(1, scale(bounds.scaleFactor(), area.height()));
         return new Rect2i(x, y, width, height);
     }
 
