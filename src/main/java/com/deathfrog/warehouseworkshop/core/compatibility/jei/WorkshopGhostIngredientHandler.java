@@ -21,6 +21,12 @@ public class WorkshopGhostIngredientHandler implements IGhostIngredientHandler<B
 {
     private static final int GRID_SIZE = 9;
 
+    @Override
+    public boolean shouldHighlightTargets()
+    {
+        return true;
+    }
+
     /**
      * Retrieves a list of ghost ingredient targets for the given BO screen.
      * <p>
