@@ -520,12 +520,22 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems = new HashMap<>();
         for (final CraftingIngredientRequirement requirement : requirements)
         {
-            if (removeMatchingIngredient(warehouseInventory, requirement, usedUniqueItems))
+            if (removeMatchingIngredient(warehouseInventory, requirement, usedUniqueItems, false))
             {
                 continue;
             }
 
-            if (includePlayerInventory && removeMatchingIngredient(playerInventory, requirement, usedUniqueItems))
+            if (includePlayerInventory && removeMatchingIngredient(playerInventory, requirement, usedUniqueItems, false))
+            {
+                continue;
+            }
+
+            if (removeMatchingIngredient(warehouseInventory, requirement, usedUniqueItems, true))
+            {
+                continue;
+            }
+
+            if (includePlayerInventory && removeMatchingIngredient(playerInventory, requirement, usedUniqueItems, true))
             {
                 continue;
             }
@@ -701,20 +711,18 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
 
     /**
      * Removes a matching ingredient from the given inventory.
-     * If the requirement has a preferred stack, the method will first try to remove the preferred stack.
-     * If the preferred stack is not found, the method will then try to remove a stack that matches the given ingredient.
-     * If the preferred stack is found and has a count of 1, the method will return true.
-     * If the fallback stack is found and has a count of 1, the method will return true.
-     * If neither the preferred stack nor the fallback stack is found, the method will return false.
+     * The ingredientFallback flag selects whether this pass removes only the preferred stack or only an ingredient fallback.
      *
      * @param inventory the inventory to remove the matching ingredient from
      * @param requirement the requirement to remove a matching ingredient for
+     * @param ingredientFallback whether to remove any ingredient match instead of the preferred stack
      * @return true if a matching ingredient was removed, false otherwise
      */
     private static boolean removeMatchingIngredient(
         final IItemHandler inventory,
         final CraftingIngredientRequirement requirement,
-        final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems)
+        final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems,
+        final boolean ingredientFallback)
     {
         ItemStack preferredStack = requirement.preferredStack();
 
@@ -723,24 +731,13 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             return false;
         }   
 
-        final int preferredSlot = findMatchingInventorySlot(inventory, requirement, usedUniqueItems, false);
-        if (preferredSlot >= 0)
-        {
-            final ItemStack extracted = inventory.extractItem(preferredSlot, 1, false);
-            if (extracted.getCount() == 1)
-            {
-                markUniqueIngredientUse(requirement, extracted, usedUniqueItems);
-                return true;
-            }
-        }
-
-        final int fallbackSlot = findMatchingInventorySlot(inventory, requirement, usedUniqueItems, true);
-        if (fallbackSlot < 0)
+        final int slot = findMatchingInventorySlot(inventory, requirement, usedUniqueItems, ingredientFallback);
+        if (slot < 0)
         {
             return false;
         }
 
-        final ItemStack extracted = inventory.extractItem(fallbackSlot, 1, false);
+        final ItemStack extracted = inventory.extractItem(slot, 1, false);
         if (extracted.getCount() == 1)
         {
             markUniqueIngredientUse(requirement, extracted, usedUniqueItems);
