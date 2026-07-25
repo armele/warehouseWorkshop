@@ -140,6 +140,7 @@ public class WorkshopJeiPlugin implements IModPlugin
             return;
         }
 
+        @SuppressWarnings("null")
         final ItemStack hoveredStack = this.jeiRuntime.getIngredientListOverlay()
             .getIngredientUnderMouse()
             .flatMap(ITypedIngredient::getItemStack)

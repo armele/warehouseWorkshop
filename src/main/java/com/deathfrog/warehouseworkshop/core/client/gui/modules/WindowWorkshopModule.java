@@ -2060,6 +2060,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      * @param stock The stock to search for matches.
      * @return A list of matches, sorted by amount in descending order, and then by name in case insensitive order.
      */
+    @SuppressWarnings("null")
     private List<ItemStorage> findMatches(final Ingredient ingredient, final Map<ItemStorage, Integer> stock)
     {
         final List<ItemStorage> matches = new ArrayList<>();
@@ -2085,6 +2086,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      * @param stock The stock to search for matches.
      * @return A list of matches, sorted by amount in descending order, and then by name in case insensitive order.
      */
+    @SuppressWarnings("null")
     private List<ItemStorage> findDomumMatches(final Block material, final Map<ItemStorage, Integer> stock)
     {
         final List<ItemStorage> matches = new ArrayList<>();
@@ -2465,6 +2467,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      * @param ingredient the ingredient storage key to count
      * @return the matching item count
      */
+    @SuppressWarnings("null")
     private int getStockCount(final Map<ItemStorage, Integer> stock, final ItemStorage ingredient)
     {
         return stock.entrySet().stream()
@@ -2555,6 +2558,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      * Additionally, it will update the status text and color based on the current grid's craftability and
      * whether it matches the selected request.
      */
+    @SuppressWarnings("null")
     private void updateRequestDetails()
     {
         updateCraftButtons();

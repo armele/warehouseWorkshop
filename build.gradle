@@ -116,8 +116,8 @@ dependencies {
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
 
-    compileOnly name: 'minecolonies-1.1.1320-1.21.1-snapshot'
-    localRuntime files ('../Minecolonies/build/libs/minecolonies-1.1.1320-1.21.1-snapshot.jar')
+    compileOnly name: 'minecolonies-1.1.1358-1.21.1-snapshot'
+    localRuntime files ('../Minecolonies/build/libs/minecolonies-1.1.1358-1.21.1-snapshot.jar')
     
     compileOnly name: 'multipiston-1.2.58-1.21.1'
     localRuntime files ('../Minecolonies/build/libs/multipiston-1.2.58-1.21.1.jar')
@@ -125,11 +125,11 @@ dependencies {
     compileOnly name: 'blockui-1.0.211-1.21.1-snapshot'  // use the actual filename without .jar
     localRuntime files('../Minecolonies/build/libs/blockui-1.0.211-1.21.1-snapshot.jar')    
 
-    compileOnly name: 'structurize-1.0.830-1.21.1'  // use the actual filename without .jar
-    localRuntime files('../Minecolonies/build/libs/structurize-1.0.830-1.21.1.jar')    
+    compileOnly name: 'structurize-1.0.832-1.21.1-snapshot'  // use the actual filename without .jar
+    localRuntime files('../Minecolonies/build/libs/structurize-1.0.832-1.21.1-snapshot.jar')    
 
-    compileOnly name: 'domum-ornamentum-1.0.233-snapshot-main'  // use the actual filename without .jar
-    localRuntime files('../Minecolonies/build/libs/domum-ornamentum-1.0.233-snapshot-main.jar') 
+    compileOnly name: 'domum-ornamentum-1.0.234-snapshot-main'  // use the actual filename without .jar
+    localRuntime files('../Minecolonies/build/libs/domum-ornamentum-1.0.234-snapshot-main.jar') 
 
     // JEI for compile-time access
     compileOnly("mezz.jei:jei-1.21.1-neoforge-api:19.27.0.336")
