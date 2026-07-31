@@ -165,12 +165,24 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         this.craftAmountInput = window.findPaneOfTypeByID("craftAmount", TextField.class);
         this.craftAmountInput.setFilter(new TextField.Filter()
         {
+            /**
+             * Normalizes edited craft-amount text to supported numeric input.
+             *
+             * @param input the proposed text value
+             * @return the sanitized text value
+             */
             @Override
             public String filter(final String input)
             {
                 return sanitizeCraftAmountText(input);
             }
 
+            /**
+             * Checks whether a character may be entered in the craft-amount field.
+             *
+             * @param c the proposed character
+             * @return true for decimal digits
+             */
             @Override
             public boolean isAllowedCharacter(final char c)
             {
@@ -244,6 +256,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         @Nullable RecipeHolder<ArchitectsCutterRecipe> domumRecipe)
     {
 
+        /**
+         * Creates a workshop recipe wrapper for a vanilla crafting recipe.
+         *
+         * @param recipe the crafting recipe holder
+         * @param level the level supplying registry access
+         * @return the wrapped crafting recipe
+         */
         @SuppressWarnings("null")
         static WorkshopRecipe crafting(final RecipeHolder<CraftingRecipe> recipe, final Level level)
         {
@@ -255,6 +274,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                 null);
         }
 
+        /**
+         * Creates a workshop recipe wrapper for an architect's cutter recipe.
+         *
+         * @param recipe the cutter recipe holder
+         * @param output the assembled output preview
+         * @return the wrapped cutter recipe
+         */
         static WorkshopRecipe domum(final RecipeHolder<ArchitectsCutterRecipe> recipe, final ItemStack output)
         {
             final ItemStack outputCopy = output.copy();
@@ -270,6 +296,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         List<WorkshopRecipe> matchingRecipes,
         int selectedRecipeIndex)
     {
+        /**
+         * Captures the current recipe-selection state of a workshop window.
+         *
+         * @param window the window to snapshot
+         * @return an independent selection snapshot
+         */
         static RecipeSelectionSnapshot capture(final WindowWorkshopModule window)
         {
             return new RecipeSelectionSnapshot(
@@ -280,6 +312,12 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                 window.selectedRecipeIndex);
         }
 
+        /**
+         * Creates independent copies of a stack list for a selection snapshot.
+         *
+         * @param stacks the stacks to copy
+         * @return independent stack copies
+         */
         private static List<ItemStack> copyStacks(final List<ItemStack> stacks)
         {
             final List<ItemStack> copies = new ArrayList<>(stacks.size());
@@ -296,15 +334,31 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      */
     private record CraftCapacity(int requestedCrafts, int supportedCrafts, Set<ItemStorage> limitingIngredients)
     {
+        /**
+         * Creates a capacity representing no requested or supported crafts.
+         *
+         * @return an empty craft capacity
+         */
         static CraftCapacity none()
         {
             return new CraftCapacity(0, 0, Set.of());
         }
 
+        /**
+         * Checks whether some, but not all, requested crafts are supported.
+         *
+         * @return true when crafting is partially supported and has limiting ingredients
+         */
         boolean isPartial()
         {
             return supportedCrafts > 0 && supportedCrafts < requestedCrafts && !limitingIngredients.isEmpty();
         }
+    }
+
+    private enum IngredientOrigin
+    {
+        WAREHOUSE,
+        PLAYER
     }
 
     /**
@@ -726,6 +780,16 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         slotStates.set(slot, SlotState.PRESENT);
     }
 
+    /**
+     * Reserves the first available matching item for a crafting-grid slot.
+     *
+     * @param slot the grid slot to populate
+     * @param requirement the slot's recipe requirement
+     * @param matches ordered matching stock candidates
+     * @param remainingStock stock remaining after earlier reservations
+     * @param reservedUniqueItems item identifiers already assigned to unique groups
+     * @return true when a candidate was reserved
+     */
     private boolean tryReserveSlotFromMatches(
         final int slot,
         final CraftingSlotRequirement requirement,
@@ -750,6 +814,14 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return false;
     }
 
+    /**
+     * Checks whether a candidate is permitted by a slot's uniqueness group.
+     *
+     * @param requirement the slot's recipe requirement
+     * @param stack the candidate stack
+     * @param reservedUniqueItems item identifiers already assigned to unique groups
+     * @return true when the candidate can be used
+     */
     private boolean canUseUniqueCandidate(
         final CraftingSlotRequirement requirement,
         final ItemStack stack,
@@ -1136,13 +1208,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return getCraftCapacity(requestedCrafts);
     }
 
-    @SuppressWarnings("null")
     /**
      * Calculates craft capacity for a fixed number of requested crafts.
      *
      * @param requestedCrafts the number of crafts to evaluate
      * @return the supported craft count and limiting ingredients
      */
+    @SuppressWarnings("null")
     private CraftCapacity getCraftCapacity(final int requestedCrafts)
     {
         final Map<ItemStorage, Integer> requiredPerCraft = new HashMap<>();
@@ -1192,8 +1264,16 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                 ? Map.of()
                 : snapshotUsableIngredientStock(requiredPerCraft, remainingWarehouseStock, remainingPlayerStock, includePlayerInventory);
 
-            consumeIngredients(requiredPerCraft, remainingWarehouseStock, remainingPlayerStock, includePlayerInventory);
-            addReturnedItems(remainingItems, remainingWarehouseStock, remainingPlayerStock, outputToWarehouse);
+            final List<IngredientOrigin> ingredientOrigins = consumeGridIngredients(
+                remainingWarehouseStock,
+                remainingPlayerStock,
+                includePlayerInventory);
+            addReturnedItems(
+                remainingItems,
+                ingredientOrigins,
+                remainingWarehouseStock,
+                remainingPlayerStock,
+                outputToWarehouse);
             supportedCrafts++;
 
             if (requestedCrafts <= 0
@@ -1259,6 +1339,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         return new CraftCapacity(requestedCrafts, supportedCrafts, limitingIngredients);
     }
 
+    /**
+     * Finds ingredients that prevent another requested craft after simulated consumption.
+     *
+     * @param requiredPerCraft ingredient counts required for one craft
+     * @param remainingWarehouseStock simulated warehouse stock
+     * @param remainingPlayerStock simulated player stock
+     * @param includePlayerInventory whether simulated player stock may be used
+     * @return the ingredients whose remaining quantities are insufficient
+     */
     private Set<ItemStorage> getLimitingIngredients(
         final Map<ItemStorage, Integer> requiredPerCraft,
         final Map<ItemStorage, Integer> remainingWarehouseStock,
@@ -1309,28 +1398,44 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     }
 
     /**
-     * Consumes the given amount of ingredients from the given stock maps.
-     * If includePlayerInventory is true, both the warehouse and player inventory are checked.
-     * 
-     * @param requiredPerCraft the map of required ingredients to their counts per craft
-     * @param remainingWarehouseStock the map of items to their counts in the remaining warehouse stock
-     * @param remainingPlayerStock the map of items to their counts in the remaining player stock
-     * @param includePlayerInventory whether to include the player inventory in the consumption
+     * Consumes the selected grid slot-by-slot and records the stock that supplied each ingredient.
+     * Crafting slots contain one item, so warehouse-first consumption gives each possible remainder
+     * an unambiguous destination.
      */
-    private void consumeIngredients(
-        final Map<ItemStorage, Integer> requiredPerCraft,
+    private List<IngredientOrigin> consumeGridIngredients(
         final Map<ItemStorage, Integer> remainingWarehouseStock,
         final Map<ItemStorage, Integer> remainingPlayerStock,
         final boolean includePlayerInventory)
     {
-        for (final Map.Entry<ItemStorage, Integer> entry : requiredPerCraft.entrySet())
+        final List<IngredientOrigin> origins = new ArrayList<>(selectedGrid.size());
+        for (final ItemStack ingredient : selectedGrid)
         {
-            int remaining = decrementStock(remainingWarehouseStock, entry.getKey(), entry.getValue());
-            if (remaining > 0 && includePlayerInventory)
+            if (ingredient.isEmpty())
             {
-                decrementStock(remainingPlayerStock, entry.getKey(), remaining);
+                origins.add(null);
+                continue;
             }
+
+            final ItemStorage storage = new ItemStorage(ingredient.copy());
+            final int warehouseAvailable = getStockCount(remainingWarehouseStock, storage);
+            if (warehouseAvailable > 0)
+            {
+                decrementStock(remainingWarehouseStock, storage, 1);
+                origins.add(IngredientOrigin.WAREHOUSE);
+                continue;
+            }
+
+            if (includePlayerInventory && getStockCount(remainingPlayerStock, storage) > 0)
+            {
+                decrementStock(remainingPlayerStock, storage, 1);
+                origins.add(IngredientOrigin.PLAYER);
+                continue;
+            }
+
+            origins.add(null);
         }
+
+        return origins;
     }
 
     /**
@@ -1388,15 +1493,27 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     @SuppressWarnings("null")
     private void addReturnedItems(
         final List<ItemStack> returnedItems,
+        final List<IngredientOrigin> ingredientOrigins,
         final Map<ItemStorage, Integer> remainingWarehouseStock,
         final Map<ItemStorage, Integer> remainingPlayerStock,
         final boolean outputToWarehouse)
     {
-        final Map<ItemStorage, Integer> targetStock = outputToWarehouse ? remainingWarehouseStock : remainingPlayerStock;
-        for (final ItemStack returned : returnedItems)
+        for (int slot = 0; slot < returnedItems.size(); slot++)
         {
+            final ItemStack returned = returnedItems.get(slot);
             if (!returned.isEmpty())
             {
+                final ItemStack ingredient = slot < selectedGrid.size() ? selectedGrid.get(slot) : ItemStack.EMPTY;
+                final IngredientOrigin origin = slot < ingredientOrigins.size() ? ingredientOrigins.get(slot) : null;
+                final Map<ItemStorage, Integer> targetStock;
+                if (!ingredient.isEmpty() && returned.is(ingredient.getItem()) && origin != null)
+                {
+                    targetStock = origin == IngredientOrigin.WAREHOUSE ? remainingWarehouseStock : remainingPlayerStock;
+                }
+                else
+                {
+                    targetStock = outputToWarehouse ? remainingWarehouseStock : remainingPlayerStock;
+                }
                 targetStock.merge(new ItemStorage(returned.copy()), returned.getCount(), Integer::sum);
             }
         }
@@ -2012,6 +2129,15 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     {
     }
 
+    /**
+     * Reserves the first candidate with available stock that satisfies uniqueness constraints.
+     *
+     * @param requirement the slot's recipe requirement
+     * @param candidates ordered candidate ingredients
+     * @param remainingStock stock remaining after earlier reservations
+     * @param reservedUniqueItems item identifiers already assigned to unique groups
+     * @return true when a candidate was reserved
+     */
     private boolean reserveFirstAvailable(
         final CraftingSlotRequirement requirement,
         final List<ItemStorage> candidates,

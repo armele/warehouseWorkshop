@@ -74,12 +74,22 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         WorkshopCraftMessage::recipeId,
         WorkshopCraftMessage::new);
 
+    /**
+     * Returns the registered payload type for this message.
+     *
+     * @return the workshop craft payload type
+     */
     @Override
     public Type<WorkshopCraftMessage> type()
     {
         return ID;
     }
 
+    /**
+     * Schedules this craft request for execution on the server thread.
+     *
+     * @param context the network payload context
+     */
     public void onExecute(@NotNull final IPayloadContext context)
     {
         final Player player = context.player();
@@ -186,15 +196,35 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
                 break;
             }
 
-            if (!removeCraftingIngredientRequirements(requiredIngredients, warehouseInventory, playerInventory, includePlayerInventory))
+            final List<ExtractedCraftingIngredient> extractedIngredients = removeCraftingIngredientRequirements(
+                requiredIngredients,
+                warehouseInventory,
+                playerInventory,
+                includePlayerInventory);
+            if (extractedIngredients == null)
             {
                 break;
             }
 
-            giveCraftingOutput(player, warehouseInventory, craftedResult.copy(), outputTarget);
-            for (final ItemStack remainder : remainingItems)
+            for (final ExtractedCraftingIngredient extracted : extractedIngredients)
             {
-                giveCraftingOutput(player, warehouseInventory, remainder.copy(), outputTarget);
+                final ItemStack remainder = remainingItems.get(extracted.gridSlot());
+                if (!remainder.isEmpty() && remainder.is(extracted.stack().getItem()))
+                {
+                    giveCraftingRemainder(player, warehouseInventory, remainder.copy(), extracted.origin());
+                }
+            }
+
+            giveCraftingOutput(player, warehouseInventory, craftedResult.copy(), outputTarget);
+            for (int slot = 0; slot < remainingItems.size(); slot++)
+            {
+                final int currentSlot = slot;
+                final ItemStack remainder = remainingItems.get(slot);
+                if (!remainder.isEmpty() && extractedIngredients.stream().noneMatch(extracted ->
+                    extracted.gridSlot() == currentSlot && remainder.is(extracted.stack().getItem())))
+                {
+                    giveCraftingOutput(player, warehouseInventory, remainder.copy(), outputTarget);
+                }
             }
             crafted++;
         }
@@ -299,6 +329,13 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         sendCraftingContentsSnapshot(player, warehouseInventory, playerInventory);
     }
 
+    /**
+     * Builds the localized completion message for a successful crafting operation.
+     *
+     * @param crafted the number of recipe executions completed
+     * @param craftedResult the result produced by one recipe execution
+     * @return the completion status message
+     */
     private Component getCraftedStatusText(final int crafted, final ItemStack craftedResult)
     {
         final int producedCount = crafted * Math.max(1, craftedResult.getCount());
@@ -315,6 +352,13 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return Component.translatable("com.warehouseworkshop.core.gui.workshop.status.crafted.request_partial", crafted, producedCount, requestedOutputCount);
     }
 
+    /**
+     * Sends updated warehouse and player inventory contents to the crafting client.
+     *
+     * @param player the player receiving the snapshot
+     * @param warehouseInventory the current warehouse inventory
+     * @param playerInventory the current player inventory
+     */
     private void sendCraftingContentsSnapshot(
         final Player player,
         final IItemHandler warehouseInventory,
@@ -326,6 +370,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         }
     }
 
+    /**
+     * Gets the material components required by an architect's cutter recipe.
+     *
+     * @param recipe the architect's cutter recipe
+     * @return the textured block components, or an empty list for an unsupported block
+     */
     private static List<IMateriallyTexturedBlockComponent> getDomumComponents(final ArchitectsCutterRecipe recipe)
     {
         if (!(recipe.getBlock() instanceof final IMateriallyTexturedBlock texturedBlock))
@@ -336,6 +386,13 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return new ArrayList<>(texturedBlock.getComponents());
     }
 
+    /**
+     * Reads the architect's cutter ingredients from their designated crafting-grid slots.
+     *
+     * @param normalizedGrid the normalized crafting grid
+     * @param componentCount the number of material components required
+     * @return copies of the selected material ingredients
+     */
     private static List<ItemStack> getDomumIngredients(final List<ItemStack> normalizedGrid, final int componentCount)
     {
         final List<ItemStack> ingredients = new ArrayList<>(componentCount);
@@ -348,6 +405,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return ingredients;
     }
 
+    /**
+     * Creates an architect's cutter input from the selected ingredients.
+     *
+     * @param ingredients the selected material ingredients
+     * @return the populated cutter recipe input
+     */
     @SuppressWarnings("null")
     private static ArchitectsCutterRecipeInput buildDomumInput(final List<ItemStack> ingredients)
     {
@@ -360,6 +423,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return new ArchitectsCutterRecipeInput(container);
     }
 
+    /**
+     * Copies all non-empty ingredient stacks.
+     *
+     * @param ingredients the ingredients to copy
+     * @return independent copies of the non-empty stacks
+     */
     private static List<ItemStack> copyIngredients(final List<ItemStack> ingredients)
     {
         final List<ItemStack> copies = new ArrayList<>(ingredients.size());
@@ -373,6 +442,13 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return copies;
     }
 
+    /**
+     * Builds slot-aware ingredient requirements for a crafting recipe.
+     *
+     * @param recipe the crafting recipe
+     * @param normalizedGrid the normalized grid containing preferred ingredient variants
+     * @return the requirements for all populated recipe slots
+     */
     private static List<CraftingIngredientRequirement> buildCraftingIngredientRequirements(
         final CraftingRecipe recipe,
         final List<ItemStack> normalizedGrid)
@@ -385,7 +461,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             final ItemStack preferred = normalizedGrid.get(slot);
             if (!requirement.ingredient().isEmpty() && !preferred.isEmpty())
             {
-                requirements.add(new CraftingIngredientRequirement(requirement.ingredient(), preferred.copy(), requirement.uniqueGroup()));
+                requirements.add(new CraftingIngredientRequirement(slot, requirement.ingredient(), preferred.copy(), requirement.uniqueGroup()));
             }
         }
 
@@ -433,6 +509,15 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return true;
     }
 
+    /**
+     * Checks whether the available inventories can satisfy all slot-aware requirements.
+     *
+     * @param requirements the crafting-slot requirements
+     * @param warehouseInventory the warehouse inventory
+     * @param playerInventory the player inventory
+     * @param includePlayerInventory whether player stock may be used
+     * @return true when every requirement has an available match
+     */
     private static boolean hasCraftingIngredientRequirements(
         final List<CraftingIngredientRequirement> requirements,
         final IItemHandler warehouseInventory,
@@ -511,39 +596,61 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return true;
     }
 
-    private static boolean removeCraftingIngredientRequirements(
+    /**
+     * Extracts all slot-aware ingredients and records the source of each extracted stack.
+     *
+     * @param requirements the crafting-slot requirements
+     * @param warehouseInventory the warehouse inventory
+     * @param playerInventory the player inventory
+     * @param includePlayerInventory whether player stock may be used
+     * @return extraction receipts in requirement order, or null if a requirement cannot be extracted
+     */
+    private static List<ExtractedCraftingIngredient> removeCraftingIngredientRequirements(
         final List<CraftingIngredientRequirement> requirements,
         final IItemHandler warehouseInventory,
         final IItemHandler playerInventory,
         final boolean includePlayerInventory)
     {
         final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems = new HashMap<>();
+        final List<ExtractedCraftingIngredient> extractedIngredients = new ArrayList<>(requirements.size());
         for (final CraftingIngredientRequirement requirement : requirements)
         {
-            if (removeMatchingIngredient(warehouseInventory, requirement, usedUniqueItems, false))
+            ItemStack extracted = removeMatchingIngredient(warehouseInventory, requirement, usedUniqueItems, false);
+            if (!extracted.isEmpty())
             {
+                extractedIngredients.add(new ExtractedCraftingIngredient(requirement.gridSlot(), extracted, IngredientOrigin.WAREHOUSE));
                 continue;
             }
 
-            if (includePlayerInventory && removeMatchingIngredient(playerInventory, requirement, usedUniqueItems, false))
+            extracted = includePlayerInventory
+                ? removeMatchingIngredient(playerInventory, requirement, usedUniqueItems, false)
+                : ItemStack.EMPTY;
+            if (!extracted.isEmpty())
             {
+                extractedIngredients.add(new ExtractedCraftingIngredient(requirement.gridSlot(), extracted, IngredientOrigin.PLAYER));
                 continue;
             }
 
-            if (removeMatchingIngredient(warehouseInventory, requirement, usedUniqueItems, true))
+            extracted = removeMatchingIngredient(warehouseInventory, requirement, usedUniqueItems, true);
+            if (!extracted.isEmpty())
             {
+                extractedIngredients.add(new ExtractedCraftingIngredient(requirement.gridSlot(), extracted, IngredientOrigin.WAREHOUSE));
                 continue;
             }
 
-            if (includePlayerInventory && removeMatchingIngredient(playerInventory, requirement, usedUniqueItems, true))
+            extracted = includePlayerInventory
+                ? removeMatchingIngredient(playerInventory, requirement, usedUniqueItems, true)
+                : ItemStack.EMPTY;
+            if (!extracted.isEmpty())
             {
+                extractedIngredients.add(new ExtractedCraftingIngredient(requirement.gridSlot(), extracted, IngredientOrigin.PLAYER));
                 continue;
             }
 
-            return false;
+            return null;
         }
 
-        return true;
+        return extractedIngredients;
     }
 
     /**
@@ -657,6 +764,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         return remaining;
     }
 
+    /**
+     * Copies every non-empty stack in an item handler.
+     *
+     * @param inventory the inventory to snapshot
+     * @return mutable copies of the inventory's non-empty stacks
+     */
     private static List<ItemStack> snapshotInventory(final IItemHandler inventory)
     {
         final List<ItemStack> snapshot = new ArrayList<>();
@@ -718,7 +831,7 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
      * @param ingredientFallback whether to remove any ingredient match instead of the preferred stack
      * @return true if a matching ingredient was removed, false otherwise
      */
-    private static boolean removeMatchingIngredient(
+    private static ItemStack removeMatchingIngredient(
         final IItemHandler inventory,
         final CraftingIngredientRequirement requirement,
         final Map<ResourceLocation, Set<ResourceLocation>> usedUniqueItems,
@@ -728,25 +841,34 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
 
         if (preferredStack == null || preferredStack.isEmpty())
         {
-            return false;
+            return ItemStack.EMPTY;
         }   
 
         final int slot = findMatchingInventorySlot(inventory, requirement, usedUniqueItems, ingredientFallback);
         if (slot < 0)
         {
-            return false;
+            return ItemStack.EMPTY;
         }
 
         final ItemStack extracted = inventory.extractItem(slot, 1, false);
         if (extracted.getCount() == 1)
         {
             markUniqueIngredientUse(requirement, extracted, usedUniqueItems);
-            return true;
+            return extracted;
         }
 
-        return false;
+        return ItemStack.EMPTY;
     }
 
+    /**
+     * Finds an inventory slot matching either the preferred stack or ingredient fallback.
+     *
+     * @param inventory the inventory to search
+     * @param requirement the slot requirement to satisfy
+     * @param usedUniqueItems item identifiers already assigned to unique groups
+     * @param ingredientFallback whether to accept any ingredient match
+     * @return the matching inventory slot, or -1 if none is available
+     */
     private static int findMatchingInventorySlot(
         final IItemHandler inventory,
         final CraftingIngredientRequirement requirement,
@@ -837,10 +959,26 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         }
     }
 
-    private record CraftingIngredientRequirement(Ingredient ingredient, ItemStack preferredStack, ResourceLocation uniqueGroup)
+    private record CraftingIngredientRequirement(int gridSlot, Ingredient ingredient, ItemStack preferredStack, ResourceLocation uniqueGroup)
     {
     }
 
+    private enum IngredientOrigin
+    {
+        WAREHOUSE,
+        PLAYER
+    }
+
+    private record ExtractedCraftingIngredient(int gridSlot, ItemStack stack, IngredientOrigin origin)
+    {
+    }
+
+    /**
+     * Builds the localized missing-ingredients status for the active inventory setting.
+     *
+     * @param includePlayerInventory whether player stock was included
+     * @return the missing-ingredients status message
+     */
     private static Component getMissingStatusText(final boolean includePlayerInventory)
     {
         return Component.translatable(includePlayerInventory
@@ -848,6 +986,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             : "com.warehouseworkshop.core.gui.workshop.status.missing");
     }
 
+    /**
+     * Adds a stack to the player's inventory and drops any overflow nearby.
+     *
+     * @param player the destination player
+     * @param stack the stack to deliver
+     */
     private static void giveToPlayer(final Player player, final ItemStack stack)
     {
         if (stack.isEmpty())
@@ -862,6 +1006,14 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         }
     }
 
+    /**
+     * Delivers a crafted result or transformed remainder to the configured output target.
+     *
+     * @param player the crafting player and warehouse-overflow recipient
+     * @param warehouseInventory the warehouse inventory
+     * @param stack the stack to deliver
+     * @param outputTarget the configured output destination
+     */
     private static void giveCraftingOutput(final Player player, final @Nonnull IItemHandler warehouseInventory, final ItemStack stack, final OutputTarget outputTarget)
     {
         if (outputTarget.isWarehouse())
@@ -873,6 +1025,36 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         giveToPlayer(player, stack);
     }
 
+    /**
+     * Returns a non-consumed ingredient to the inventory from which it was extracted.
+     *
+     * @param player the crafting player and warehouse-overflow recipient
+     * @param warehouseInventory the warehouse inventory
+     * @param stack the recipe remainder to return
+     * @param origin the inventory that supplied the ingredient
+     */
+    private static void giveCraftingRemainder(
+        final Player player,
+        final @Nonnull IItemHandler warehouseInventory,
+        final ItemStack stack,
+        final IngredientOrigin origin)
+    {
+        if (origin == IngredientOrigin.WAREHOUSE)
+        {
+            giveToWarehouse(player, warehouseInventory, stack);
+            return;
+        }
+
+        giveToPlayer(player, stack);
+    }
+
+    /**
+     * Inserts a stack into warehouse storage and gives any overflow to the player.
+     *
+     * @param player the overflow recipient
+     * @param warehouseInventory the warehouse inventory
+     * @param stack the stack to insert
+     */
     private static void giveToWarehouse(final Player player, final @Nonnull IItemHandler warehouseInventory, final ItemStack stack)
     {
         if (stack.isEmpty())
