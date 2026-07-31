@@ -18,6 +18,7 @@ import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopMod
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopPlayerSettings;
 import com.deathfrog.warehouseworkshop.core.compatibility.recipes.OptionalRecipeSupport;
 import com.deathfrog.warehouseworkshop.core.compatibility.recipes.OptionalRecipeSupport.CraftingSlotRequirement;
+import com.deathfrog.warehouseworkshop.core.compatibility.recipes.PositionedCraftingSlots;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlock;
 import com.ldtteam.domumornamentum.block.IMateriallyTexturedBlockComponent;
 import com.ldtteam.domumornamentum.recipe.ModRecipeTypes;
@@ -42,6 +43,7 @@ import net.minecraft.world.item.crafting.CraftingInput;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.items.wrapper.PlayerMainInvWrapper;
@@ -52,6 +54,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, int craftCount, int requestedOutputCount, int craftType, ResourceLocation recipeId) implements IServerboundPayload
 {
+    private static final int CRAFTING_GRID_WIDTH = 3;
+    private static final int CRAFTING_GRID_HEIGHT = 3;
+    private static final int GRID_SIZE = CRAFTING_GRID_WIDTH * CRAFTING_GRID_HEIGHT;
     public static final int CRAFT_TYPE_CRAFTING = 0;
     public static final int CRAFT_TYPE_DOMUM = 1;
 
@@ -161,7 +166,11 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
         final WorkshopModule module,
         final List<ItemStack> normalizedGrid)
     {
-        final CraftingInput input = CraftingInput.of(3, 3, normalizedGrid);
+        final CraftingInput.Positioned positionedInput = CraftingInput.ofPositioned(
+            CRAFTING_GRID_WIDTH,
+            CRAFTING_GRID_HEIGHT,
+            normalizedGrid);
+        final CraftingInput input = positionedInput.input();
         final Optional<RecipeHolder<?>> recipe = player.level().getRecipeManager().byKey(recipeId);
         if (recipe.isEmpty()
             || !recipe.get().id().equals(recipeId)
@@ -172,7 +181,12 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
             return;
         }
 
-        final List<CraftingIngredientRequirement> requiredIngredients = buildCraftingIngredientRequirements(craftingRecipe, normalizedGrid);
+        final List<CraftingIngredientRequirement> requiredIngredients = buildCraftingIngredientRequirements(craftingRecipe, positionedInput);
+        if (requiredIngredients.size() != input.ingredientCount())
+        {
+            player.displayClientMessage(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.invalid"), true);
+            return;
+        }
         final WorkshopPlayerSettings settings = WorkshopPlayerSettings.get(player, buildingPos);
         final boolean includePlayerInventory = settings.includePlayerInventory();
         final IItemHandler warehouseInventory = building.getItemHandlerCap();
@@ -186,6 +200,27 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
 
         final ItemStack craftedResult = craftingRecipe.assemble(input, player.level().registryAccess()).copy();
         final List<ItemStack> remainingItems = craftingRecipe.getRemainingItems(input);
+        if (remainingItems.size() != input.size())
+        {
+            WarehouseWorkshopMod.LOGGER.error(
+                "Recipe {} returned {} crafting remainders for an input of size {}",
+                recipeId,
+                remainingItems.size(),
+                input.size());
+            player.displayClientMessage(Component.translatable("com.warehouseworkshop.core.gui.workshop.status.invalid"), true);
+            return;
+        }
+
+        final int[] remainderFullGridSlots = new int[remainingItems.size()];
+        for (int localSlot = 0; localSlot < remainderFullGridSlots.length; localSlot++)
+        {
+            remainderFullGridSlots[localSlot] = PositionedCraftingSlots.toFullGridSlot(
+                positionedInput,
+                localSlot,
+                CRAFTING_GRID_WIDTH,
+                CRAFTING_GRID_HEIGHT);
+        }
+
         final OutputTarget outputTarget = settings.outputTarget();
         int crafted = 0;
 
@@ -206,22 +241,24 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
                 break;
             }
 
-            for (final ExtractedCraftingIngredient extracted : extractedIngredients)
+            final boolean[] returnedToOrigin = new boolean[remainingItems.size()];
+            for (int localSlot = 0; localSlot < remainingItems.size(); localSlot++)
             {
-                final ItemStack remainder = remainingItems.get(extracted.gridSlot());
-                if (!remainder.isEmpty() && remainder.is(extracted.stack().getItem()))
+                final ItemStack remainder = remainingItems.get(localSlot);
+                final int fullGridSlot = remainderFullGridSlots[localSlot];
+                final ExtractedCraftingIngredient extracted = findExtractedIngredient(extractedIngredients, fullGridSlot);
+                if (extracted != null && !remainder.isEmpty() && remainder.is(extracted.stack().getItem()))
                 {
                     giveCraftingRemainder(player, warehouseInventory, remainder.copy(), extracted.origin());
+                    returnedToOrigin[localSlot] = true;
                 }
             }
 
             giveCraftingOutput(player, warehouseInventory, craftedResult.copy(), outputTarget);
-            for (int slot = 0; slot < remainingItems.size(); slot++)
+            for (int localSlot = 0; localSlot < remainingItems.size(); localSlot++)
             {
-                final int currentSlot = slot;
-                final ItemStack remainder = remainingItems.get(slot);
-                if (!remainder.isEmpty() && extractedIngredients.stream().noneMatch(extracted ->
-                    extracted.gridSlot() == currentSlot && remainder.is(extracted.stack().getItem())))
+                final ItemStack remainder = remainingItems.get(localSlot);
+                if (!remainder.isEmpty() && !returnedToOrigin[localSlot])
                 {
                     giveCraftingOutput(player, warehouseInventory, remainder.copy(), outputTarget);
                 }
@@ -446,26 +483,158 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
      * Builds slot-aware ingredient requirements for a crafting recipe.
      *
      * @param recipe the crafting recipe
-     * @param normalizedGrid the normalized grid containing preferred ingredient variants
+     * @param positionedInput the trimmed input and its position in the full crafting grid
      * @return the requirements for all populated recipe slots
      */
     private static List<CraftingIngredientRequirement> buildCraftingIngredientRequirements(
         final CraftingRecipe recipe,
-        final List<ItemStack> normalizedGrid)
+        final CraftingInput.Positioned positionedInput)
     {
-        final List<CraftingSlotRequirement> slotRequirements = OptionalRecipeSupport.buildCraftingSlotRequirements(recipe, 9);
-        final List<CraftingIngredientRequirement> requirements = new ArrayList<>(slotRequirements.size());
-        for (int slot = 0; slot < Math.min(slotRequirements.size(), normalizedGrid.size()); slot++)
+        final List<CraftingSlotRequirement> slotRequirements = OptionalRecipeSupport.buildCraftingSlotRequirements(recipe, GRID_SIZE);
+        final CraftingInput input = positionedInput.input();
+        if (recipe instanceof final ShapedRecipe shapedRecipe
+            && shapedRecipe.getWidth() == input.width()
+            && shapedRecipe.getHeight() == input.height())
         {
-            final CraftingSlotRequirement requirement = slotRequirements.get(slot);
-            final ItemStack preferred = normalizedGrid.get(slot);
-            if (!requirement.ingredient().isEmpty() && !preferred.isEmpty())
+            final boolean directMatch = matchesShapedRequirements(input, slotRequirements, false);
+            final boolean mirrored = !directMatch && matchesShapedRequirements(input, slotRequirements, true);
+            if (!directMatch && !mirrored)
             {
-                requirements.add(new CraftingIngredientRequirement(slot, requirement.ingredient(), preferred.copy(), requirement.uniqueGroup()));
+                return List.of();
+            }
+
+            return buildShapedIngredientRequirements(positionedInput, slotRequirements, mirrored);
+        }
+
+        final List<CraftingSlotRequirement> unmatchedRequirements = new ArrayList<>();
+        for (final CraftingSlotRequirement requirement : slotRequirements)
+        {
+            if (!requirement.ingredient().isEmpty())
+            {
+                unmatchedRequirements.add(requirement);
             }
         }
 
+        final List<CraftingIngredientRequirement> requirements = new ArrayList<>(input.ingredientCount());
+        for (int localSlot = 0; localSlot < input.size(); localSlot++)
+        {
+            final ItemStack preferred = input.getItem(localSlot);
+            if (preferred.isEmpty())
+            {
+                continue;
+            }
+
+            final int match = findMatchingRequirement(unmatchedRequirements, preferred);
+            if (match < 0)
+            {
+                return List.of();
+            }
+
+            final CraftingSlotRequirement requirement = unmatchedRequirements.remove(match);
+            final int fullGridSlot = PositionedCraftingSlots.toFullGridSlot(
+                positionedInput,
+                localSlot,
+                CRAFTING_GRID_WIDTH,
+                CRAFTING_GRID_HEIGHT);
+            requirements.add(new CraftingIngredientRequirement(
+                fullGridSlot,
+                requirement.ingredient(),
+                preferred.copy(),
+                requirement.uniqueGroup()));
+        }
+
         return requirements;
+    }
+
+    /**
+     * Checks whether a shaped recipe's requirements match the actual input orientation.
+     *
+     * @param input the trimmed crafting input
+     * @param slotRequirements canonical recipe requirements in a 3x3 grid
+     * @param mirrored whether to test a horizontal mirror of the recipe
+     * @return true when every input slot matches the corresponding requirement
+     */
+    private static boolean matchesShapedRequirements(
+        final CraftingInput input,
+        final List<CraftingSlotRequirement> slotRequirements,
+        final boolean mirrored)
+    {
+        for (int localSlot = 0; localSlot < input.size(); localSlot++)
+        {
+            final int denseRecipeSlot = PositionedCraftingSlots.toShapedRecipeSlot(localSlot, input.width(), mirrored);
+            final int recipeSlot = ((denseRecipeSlot / input.width()) * CRAFTING_GRID_WIDTH)
+                + (denseRecipeSlot % input.width());
+            final Ingredient ingredient = slotRequirements.get(recipeSlot).ingredient();
+            final ItemStack stack = input.getItem(localSlot);
+            if (ingredient.isEmpty() != stack.isEmpty() || (!ingredient.isEmpty() && !ingredient.test(stack)))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Builds absolute-grid requirements for a shaped recipe in its matched orientation.
+     *
+     * @param positionedInput the trimmed input and its full-grid position
+     * @param slotRequirements canonical recipe requirements in a 3x3 grid
+     * @param mirrored whether the recipe matched horizontally mirrored
+     * @return requirements associated with the actual occupied full-grid slots
+     */
+    private static List<CraftingIngredientRequirement> buildShapedIngredientRequirements(
+        final CraftingInput.Positioned positionedInput,
+        final List<CraftingSlotRequirement> slotRequirements,
+        final boolean mirrored)
+    {
+        final CraftingInput input = positionedInput.input();
+        final List<CraftingIngredientRequirement> requirements = new ArrayList<>(input.ingredientCount());
+        for (int localSlot = 0; localSlot < input.size(); localSlot++)
+        {
+            final ItemStack preferred = input.getItem(localSlot);
+            if (preferred.isEmpty())
+            {
+                continue;
+            }
+
+            final int denseRecipeSlot = PositionedCraftingSlots.toShapedRecipeSlot(localSlot, input.width(), mirrored);
+            final int recipeSlot = ((denseRecipeSlot / input.width()) * CRAFTING_GRID_WIDTH)
+                + (denseRecipeSlot % input.width());
+            final CraftingSlotRequirement requirement = slotRequirements.get(recipeSlot);
+            final int fullGridSlot = PositionedCraftingSlots.toFullGridSlot(
+                positionedInput,
+                localSlot,
+                CRAFTING_GRID_WIDTH,
+                CRAFTING_GRID_HEIGHT);
+            requirements.add(new CraftingIngredientRequirement(
+                fullGridSlot,
+                requirement.ingredient(),
+                preferred.copy(),
+                requirement.uniqueGroup()));
+        }
+
+        return requirements;
+    }
+
+    /**
+     * Finds the first unmatched requirement satisfied by an actual input stack.
+     *
+     * @param requirements unmatched recipe requirements
+     * @param stack the actual input stack
+     * @return the matching requirement index, or -1 if none matches
+     */
+    private static int findMatchingRequirement(final List<CraftingSlotRequirement> requirements, final ItemStack stack)
+    {
+        for (int i = 0; i < requirements.size(); i++)
+        {
+            if (requirements.get(i).ingredient().test(stack))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     /**
@@ -971,6 +1140,28 @@ public record WorkshopCraftMessage(BlockPos buildingPos, List<ItemStack> grid, i
 
     private record ExtractedCraftingIngredient(int gridSlot, ItemStack stack, IngredientOrigin origin)
     {
+    }
+
+    /**
+     * Finds the extracted ingredient associated with a full crafting-grid slot.
+     *
+     * @param extractedIngredients the extraction receipts for the current craft
+     * @param fullGridSlot the slot in the original crafting grid
+     * @return the matching extraction receipt, or null when the slot had no extracted ingredient
+     */
+    private static ExtractedCraftingIngredient findExtractedIngredient(
+        final List<ExtractedCraftingIngredient> extractedIngredients,
+        final int fullGridSlot)
+    {
+        for (final ExtractedCraftingIngredient extracted : extractedIngredients)
+        {
+            if (extracted.gridSlot() == fullGridSlot)
+            {
+                return extracted;
+            }
+        }
+
+        return null;
     }
 
     /**

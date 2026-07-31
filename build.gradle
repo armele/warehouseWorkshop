@@ -137,6 +137,14 @@ dependencies {
 
     // Runtime for dev only (so it loads in runClient/runServer)
     localRuntime("mezz.jei:jei-1.21.1-neoforge:19.27.0.336")
+
+    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

@@ -20,6 +20,7 @@ import com.deathfrog.warehouseworkshop.api.colony.buildings.moduleviews.Workshop
 import com.deathfrog.warehouseworkshop.core.colony.buildings.modules.WorkshopModule.OutputTarget;
 import com.deathfrog.warehouseworkshop.core.compatibility.recipes.OptionalRecipeSupport;
 import com.deathfrog.warehouseworkshop.core.compatibility.recipes.OptionalRecipeSupport.CraftingSlotRequirement;
+import com.deathfrog.warehouseworkshop.core.compatibility.recipes.PositionedCraftingSlots;
 import com.deathfrog.warehouseworkshop.core.network.RequestWorkshopSettingsMessage;
 import com.deathfrog.warehouseworkshop.core.network.SetWorkshopIncludePlayerInventoryMessage;
 import com.deathfrog.warehouseworkshop.core.network.SetWorkshopOutputTargetMessage;
@@ -75,6 +76,8 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleView>
 {
     private static final int GRID_SIZE = 9;
+    private static final int GRID_WIDTH = 3;
+    private static final int GRID_HEIGHT = 3;
     private static final int DOMUM_FIRST_SLOT = 1;
     private static final int DOMUM_SECOND_SLOT = 4;
     private static final int STATUS_TEXT_COLOR = Color.getByName("black", 0x000000);
@@ -1244,13 +1247,22 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             return getBasicCraftCapacity(requestedCrafts, requiredPerCraft);
         }
 
-        final CraftingInput input = CraftingInput.of(3, 3, List.copyOf(selectedGrid));
-        if (input == null || input.isEmpty())
+        final CraftingInput.Positioned positionedInput = CraftingInput.ofPositioned(
+            GRID_WIDTH,
+            GRID_HEIGHT,
+            List.copyOf(selectedGrid));
+        final CraftingInput input = positionedInput.input();
+        if (input.isEmpty())
         {
             return CraftCapacity.none();
         }
 
         final List<ItemStack> remainingItems = currentRecipe.value().getRemainingItems(input);
+        if (remainingItems.size() != input.size())
+        {
+            return CraftCapacity.none();
+        }
+
         final Map<ItemStorage, Integer> remainingWarehouseStock = new HashMap<>(warehouseStock);
         final Map<ItemStorage, Integer> remainingPlayerStock = new HashMap<>(playerStock);
         final boolean includePlayerInventory = moduleView.shouldIncludePlayerInventory();
@@ -1269,6 +1281,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                 remainingPlayerStock,
                 includePlayerInventory);
             addReturnedItems(
+                positionedInput,
                 remainingItems,
                 ingredientOrigins,
                 remainingWarehouseStock,
@@ -1485,26 +1498,34 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      * If the output target is set to the warehouse, the returned items are added to the remaining warehouse stock.
      * If the output target is set to the player inventory, the returned items are added to the remaining player stock.
      * The target stock is updated with the number of items of each type that were returned.
+     * @param positionedInput the trimmed crafting input and its position in the full grid
      * @param returnedItems the list of items that were returned
+     * @param ingredientOrigins the source inventory for each full-grid ingredient slot
      * @param remainingWarehouseStock the map of items to their counts in the remaining warehouse stock
      * @param remainingPlayerStock the map of items to their counts in the remaining player stock
      * @param outputToWarehouse whether the output target is the warehouse
      */
     @SuppressWarnings("null")
     private void addReturnedItems(
+        final CraftingInput.Positioned positionedInput,
         final List<ItemStack> returnedItems,
         final List<IngredientOrigin> ingredientOrigins,
         final Map<ItemStorage, Integer> remainingWarehouseStock,
         final Map<ItemStorage, Integer> remainingPlayerStock,
         final boolean outputToWarehouse)
     {
-        for (int slot = 0; slot < returnedItems.size(); slot++)
+        for (int localSlot = 0; localSlot < returnedItems.size(); localSlot++)
         {
-            final ItemStack returned = returnedItems.get(slot);
+            final ItemStack returned = returnedItems.get(localSlot);
             if (!returned.isEmpty())
             {
-                final ItemStack ingredient = slot < selectedGrid.size() ? selectedGrid.get(slot) : ItemStack.EMPTY;
-                final IngredientOrigin origin = slot < ingredientOrigins.size() ? ingredientOrigins.get(slot) : null;
+                final int fullGridSlot = PositionedCraftingSlots.toFullGridSlot(
+                    positionedInput,
+                    localSlot,
+                    GRID_WIDTH,
+                    GRID_HEIGHT);
+                final ItemStack ingredient = selectedGrid.get(fullGridSlot);
+                final IngredientOrigin origin = ingredientOrigins.get(fullGridSlot);
                 final Map<ItemStorage, Integer> targetStock;
                 if (!ingredient.isEmpty() && returned.is(ingredient.getItem()) && origin != null)
                 {
