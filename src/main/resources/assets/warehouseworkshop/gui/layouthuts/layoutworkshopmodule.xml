@@ -1,92 +1,129 @@
 <window xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/ldtteam/BlockUI/version/main/src/main/resources/assets/blockui/gui/block_ui.xsd"
-    size="240 294">
-    <image source="minecolonies:textures/gui/builderhut/builder_paper.png" size="240 294"/>
+    size="240 318">
+    <image source="minecolonies:textures/gui/builderhut/builder_paper.png" size="240 318"/>
 
     <text id="desc" size="120 11" pos="60 10" textalign="MIDDLE" color="black"
            label="$(com.warehouseworkshop.core.gui.workshop.title)"/>
 
-    <box pos="12 28" size="78 78" linewidth="1"/>
+    <box pos="12 24" size="216 21" linewidth="1"/>
+    <itemicon id="breadcrumbIcon0" size="18 18" pos="15 26" visible="false"/>
+    <button id="breadcrumbButton0" size="18 18" pos="15 26" visible="false"
+            source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <text id="breadcrumbSeparator0" size="6 10" pos="34 30" textalign="MIDDLE" color="black" label="&gt;" visible="false"/>
+    <itemicon id="breadcrumbIcon1" size="18 18" pos="39 26" visible="false"/>
+    <button id="breadcrumbButton1" size="18 18" pos="39 26" visible="false"
+            source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <text id="breadcrumbSeparator1" size="6 10" pos="58 30" textalign="MIDDLE" color="black" label="&gt;" visible="false"/>
+    <itemicon id="breadcrumbIcon2" size="18 18" pos="63 26" visible="false"/>
+    <button id="breadcrumbButton2" size="18 18" pos="63 26" visible="false"
+            source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <text id="breadcrumbSeparator2" size="6 10" pos="82 30" textalign="MIDDLE" color="black" label="&gt;" visible="false"/>
+    <itemicon id="breadcrumbIcon3" size="18 18" pos="87 26" visible="false"/>
+    <button id="breadcrumbButton3" size="18 18" pos="87 26" visible="false"
+            source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <text id="breadcrumbSeparator3" size="6 10" pos="106 30" textalign="MIDDLE" color="black" label="&gt;" visible="false"/>
+    <itemicon id="breadcrumbIcon4" size="18 18" pos="111 26" visible="false"/>
+    <button id="breadcrumbButton4" size="18 18" pos="111 26" visible="false"
+            source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <text id="breadcrumbSeparator4" size="6 10" pos="130 30" textalign="MIDDLE" color="black" label="&gt;" visible="false"/>
+    <itemicon id="breadcrumbIcon5" size="18 18" pos="135 26" visible="false"/>
+    <button id="breadcrumbButton5" size="18 18" pos="135 26" visible="false"
+            source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <text id="breadcrumbSeparator5" size="6 10" pos="154 30" textalign="MIDDLE" color="black" label="&gt;" visible="false"/>
+    <itemicon id="breadcrumbIcon6" size="18 18" pos="159 26" visible="false"/>
+    <button id="breadcrumbButton6" size="18 18" pos="159 26" visible="false"
+            source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <text id="breadcrumbSeparator6" size="6 10" pos="178 30" textalign="MIDDLE" color="black" label="&gt;" visible="false"/>
+    <itemicon id="breadcrumbIcon7" size="18 18" pos="183 26" visible="false"/>
+    <button id="breadcrumbButton7" size="18 18" pos="183 26" visible="false"
+            source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <text id="breadcrumbSeparator7" size="6 10" pos="202 30" textalign="MIDDLE" color="black" label="&gt;" visible="false"/>
+    <itemicon id="breadcrumbIcon8" size="18 18" pos="207 26" visible="false"/>
+    <button id="breadcrumbButton8" size="18 18" pos="207 26" visible="false"
+            source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
 
-    <itemicon id="gridIcon0" size="18 18" pos="17 31"/>
-    <itemicon id="gridIcon1" size="18 18" pos="42 31"/>
-    <itemicon id="gridIcon2" size="18 18" pos="67 31"/>
-    <itemicon id="gridIcon3" size="18 18" pos="17 55"/>
-    <itemicon id="gridIcon4" size="18 18" pos="42 55"/>
-    <itemicon id="gridIcon5" size="18 18" pos="67 55"/>
-    <itemicon id="gridIcon6" size="18 18" pos="17 79"/>
-    <itemicon id="gridIcon7" size="18 18" pos="42 79"/>
-    <itemicon id="gridIcon8" size="18 18" pos="67 79"/>
+    <box pos="12 52" size="78 78" linewidth="1"/>
 
-    <button id="gridButton0" size="18 18" pos="17 31" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton1" size="18 18" pos="42 31" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton2" size="18 18" pos="67 31" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton3" size="18 18" pos="17 55" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton4" size="18 18" pos="42 55" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton5" size="18 18" pos="67 55" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton6" size="18 18" pos="17 79" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton7" size="18 18" pos="42 79" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
-    <button id="gridButton8" size="18 18" pos="67 79" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <itemicon id="gridIcon0" size="18 18" pos="17 55"/>
+    <itemicon id="gridIcon1" size="18 18" pos="42 55"/>
+    <itemicon id="gridIcon2" size="18 18" pos="67 55"/>
+    <itemicon id="gridIcon3" size="18 18" pos="17 79"/>
+    <itemicon id="gridIcon4" size="18 18" pos="42 79"/>
+    <itemicon id="gridIcon5" size="18 18" pos="67 79"/>
+    <itemicon id="gridIcon6" size="18 18" pos="17 103"/>
+    <itemicon id="gridIcon7" size="18 18" pos="42 103"/>
+    <itemicon id="gridIcon8" size="18 18" pos="67 103"/>
 
-    <gradient id="gridBackground0" size="18 18" pos="17 31" visible="false" enabled="false"/>
-    <gradient id="gridBackground1" size="18 18" pos="42 31" visible="false" enabled="false"/>
-    <gradient id="gridBackground2" size="18 18" pos="67 31" visible="false" enabled="false"/>
-    <gradient id="gridBackground3" size="18 18" pos="17 55" visible="false" enabled="false"/>
-    <gradient id="gridBackground4" size="18 18" pos="42 55" visible="false" enabled="false"/>
-    <gradient id="gridBackground5" size="18 18" pos="67 55" visible="false" enabled="false"/>
-    <gradient id="gridBackground6" size="18 18" pos="17 79" visible="false" enabled="false"/>
-    <gradient id="gridBackground7" size="18 18" pos="42 79" visible="false" enabled="false"/>
-    <gradient id="gridBackground8" size="18 18" pos="67 79" visible="false" enabled="false"/>
+    <button id="gridButton0" size="18 18" pos="17 55" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton1" size="18 18" pos="42 55" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton2" size="18 18" pos="67 55" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton3" size="18 18" pos="17 79" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton4" size="18 18" pos="42 79" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton5" size="18 18" pos="67 79" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton6" size="18 18" pos="17 103" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton7" size="18 18" pos="42 103" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
+    <button id="gridButton8" size="18 18" pos="67 103" source="minecolonies:textures/gui/builderhut/builder_button_mini.png"/>
 
-    <text id="gridStatusIcon0" size="8 8" pos="22 48" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
-    <text id="gridStatusIcon1" size="8 8" pos="47 48" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
-    <text id="gridStatusIcon2" size="8 8" pos="72 48" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
-    <text id="gridStatusIcon3" size="8 8" pos="22 72" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
-    <text id="gridStatusIcon4" size="8 8" pos="47 72" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
-    <text id="gridStatusIcon5" size="8 8" pos="72 72" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
-    <text id="gridStatusIcon6" size="8 8" pos="22 96" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
-    <text id="gridStatusIcon7" size="8 8" pos="47 96" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
-    <text id="gridStatusIcon8" size="8 8" pos="72 96" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <gradient id="gridBackground0" size="18 18" pos="17 55" visible="false" enabled="false"/>
+    <gradient id="gridBackground1" size="18 18" pos="42 55" visible="false" enabled="false"/>
+    <gradient id="gridBackground2" size="18 18" pos="67 55" visible="false" enabled="false"/>
+    <gradient id="gridBackground3" size="18 18" pos="17 79" visible="false" enabled="false"/>
+    <gradient id="gridBackground4" size="18 18" pos="42 79" visible="false" enabled="false"/>
+    <gradient id="gridBackground5" size="18 18" pos="67 79" visible="false" enabled="false"/>
+    <gradient id="gridBackground6" size="18 18" pos="17 103" visible="false" enabled="false"/>
+    <gradient id="gridBackground7" size="18 18" pos="42 103" visible="false" enabled="false"/>
+    <gradient id="gridBackground8" size="18 18" pos="67 103" visible="false" enabled="false"/>
 
-    <box pos="98 28" size="130 78" linewidth="1"/>
-    <text id="recipeLabel" size="118 10" pos="104 31" textalign="MIDDLE" color="black"/>
-    <text id="outputLabel" size="50 10" pos="110 45" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.request_item)"/>
-    <text id="craftedOutputLabel" size="50 10" pos="169 45" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.output)"/>
-    <itemicon id="requestPreview" size="18 18" pos="113 56"/>
-    <itemicon id="outputPreview" size="18 18" pos="172 56"/>
-    <button id="request" size="16 16" pos="105 81"
+    <text id="gridStatusIcon0" size="8 8" pos="22 72" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon1" size="8 8" pos="47 72" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon2" size="8 8" pos="72 72" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon3" size="8 8" pos="22 96" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon4" size="8 8" pos="47 96" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon5" size="8 8" pos="72 96" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon6" size="8 8" pos="22 120" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon7" size="8 8" pos="47 120" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+    <text id="gridStatusIcon8" size="8 8" pos="72 120" textalign="MIDDLE" color="black" textscale="0.9" visible="false"/>
+
+    <box pos="98 52" size="130 78" linewidth="1"/>
+    <text id="recipeLabel" size="118 10" pos="104 55" textalign="MIDDLE" color="black"/>
+    <text id="outputLabel" size="50 10" pos="110 69" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.request_item)"/>
+    <text id="craftedOutputLabel" size="50 10" pos="169 69" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.core.gui.workshop.output)"/>
+    <itemicon id="requestPreview" size="18 18" pos="113 80"/>
+    <itemicon id="outputPreview" size="18 18" pos="172 80"/>
+    <button id="request" size="16 16" pos="105 105"
             source="minecolonies:textures/gui/citizen/detail_button.png"/>
-    <button id="prevRecipe" size="10 14" pos="127 82" color="black"
+    <button id="prevRecipe" size="10 14" pos="127 106" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_mini.png"
             label="&lt;"/>
-    <button id="nextRecipe" size="10 14" pos="139 82" color="black"
+    <button id="nextRecipe" size="10 14" pos="139 106" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_mini.png"
             label="&gt;"/>
 
-    <box pos="12 112" size="216 38" linewidth="1"/>
-    <text id="requestLabel" size="204 10" pos="18 118" color="black"/>
-    <text id="statusLabel" size="204 18" pos="18 130" color="black"/>
-    <box pos="12 154" size="216 40" linewidth="1"/>
-    <text id="outputTargetLabel" size="72 10" pos="18 164" color="black"
+    <box pos="12 136" size="216 38" linewidth="1"/>
+    <text id="requestLabel" size="204 10" pos="18 142" color="black"/>
+    <text id="statusLabel" size="204 18" pos="18 154" color="black"/>
+    <box pos="12 178" size="216 40" linewidth="1"/>
+    <text id="outputTargetLabel" size="72 10" pos="18 188" color="black"
           label="$(com.warehouseworkshop.core.gui.workshop.output_target.label)"/>
-    <button id="outputTarget" size="88 16" pos="128 160" color="black"
+    <button id="outputTarget" size="88 16" pos="128 184" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.output_target.inventory)"/>
-    <text id="includePlayerInventoryLabel" size="96 10" pos="18 180" color="black"
+    <text id="includePlayerInventoryLabel" size="96 10" pos="18 204" color="black"
           label="$(com.warehouseworkshop.core.gui.workshop.include_player_inventory.label)"/>
-    <button id="includePlayerInventory" size="88 16" pos="128 176" color="black"
+    <button id="includePlayerInventory" size="88 16" pos="128 200" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.include_player_inventory.no)"/>
-    <box pos="12 198" size="216 38" linewidth="1"/>
-    <text id="craftAmountLabel" size="72 10" pos="18 208" color="black"
+    <box pos="12 222" size="216 38" linewidth="1"/>
+    <text id="craftAmountLabel" size="72 10" pos="18 232" color="black"
           label="$(com.warehouseworkshop.core.gui.workshop.craft_amount.label)"/>
-    <input id="craftAmount" size="40 16" pos="176 204" color="white" textContent="1" maxlength="9"/>
-    <button id="clear" size="52 16" pos="37 265" color="black"
+    <input id="craftAmount" size="40 16" pos="176 228" color="white" textContent="1" maxlength="9"/>
+    <button id="clear" size="52 16" pos="37 289" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.clear)"/>
-    <button id="craftAll" size="52 16" pos="94 265" color="black"
+    <button id="craftAll" size="52 16" pos="94 289" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.craft_all)"/>
-    <button id="craft" size="52 16" pos="151 265" color="black"
+    <button id="craft" size="52 16" pos="151 289" color="black"
             source="minecolonies:textures/gui/builderhut/builder_button_small.png"
             label="$(com.warehouseworkshop.core.gui.workshop.craft)"/>
 </window>

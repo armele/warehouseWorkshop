@@ -99,12 +99,17 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private static final String LIMITED_SLOT_ICON = "!";
     private static final String MISSING_SLOT_ICON = "X";
     private static final String DEFAULT_CRAFT_AMOUNT = "1";
+    private static final int MAX_VISIBLE_BREADCRUMBS = 9;
 
     private final List<Gradient> gridBackgrounds = new ArrayList<>(GRID_SIZE);
     private final List<ItemIcon> gridIcons = new ArrayList<>(GRID_SIZE);
     private final List<Text> gridStatusIcons = new ArrayList<>(GRID_SIZE);
     private final List<Tooltip> gridStatusTooltips = new ArrayList<>(GRID_SIZE);
     private final List<Button> gridButtons = new ArrayList<>(GRID_SIZE);
+    private final List<ItemIcon> breadcrumbIcons = new ArrayList<>(MAX_VISIBLE_BREADCRUMBS);
+    private final List<Button> breadcrumbButtons = new ArrayList<>(MAX_VISIBLE_BREADCRUMBS);
+    private final List<Text> breadcrumbSeparators = new ArrayList<>(MAX_VISIBLE_BREADCRUMBS - 1);
+    private final List<Tooltip> breadcrumbTooltips = new ArrayList<>(MAX_VISIBLE_BREADCRUMBS);
     private final List<ItemStack> selectedGrid = new ArrayList<>(Collections.nCopies(GRID_SIZE, ItemStack.EMPTY));
     private final List<ItemStack> displayGrid = new ArrayList<>(Collections.nCopies(GRID_SIZE, ItemStack.EMPTY));
     private final List<SlotState> slotStates = new ArrayList<>(Collections.nCopies(GRID_SIZE, SlotState.EMPTY));
@@ -126,11 +131,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private final Map<ItemStorage, Integer> playerStock = new HashMap<>();
     private final List<ItemStack> requestOutputs = new ArrayList<>();
     private final List<WorkshopRecipe> matchingRecipes = new ArrayList<>();
+    private final List<CraftNavigationEntry> breadcrumbTrail = new ArrayList<>();
 
     private @Nullable IRequest<?> selectedRequest;
     private ItemStack jeiSearchOutput = ItemStack.EMPTY;
     private int selectedRecipeIndex = -1;
     private boolean playerSettingsLoaded;
+    private boolean restoringBreadcrumb;
 
     /**
      * Creates the workshop module window and wires its controls to their handlers.
@@ -153,6 +160,21 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             gridButtons.add(gridButton);
             gridStatusTooltips.add(PaneBuilders.tooltipBuilder().hoverPane(gridStatusIcon).build());
             registerButton("gridButton" + i, () -> setActiveSlot(slot));
+        }
+
+        for (int i = 0; i < MAX_VISIBLE_BREADCRUMBS; i++)
+        {
+            final int visibleIndex = i;
+            final ItemIcon icon = window.findPaneOfTypeByID("breadcrumbIcon" + i, ItemIcon.class);
+            final Button button = window.findPaneOfTypeByID("breadcrumbButton" + i, Button.class);
+            breadcrumbIcons.add(icon);
+            breadcrumbButtons.add(button);
+            breadcrumbTooltips.add(PaneBuilders.tooltipBuilder().hoverPane(button).build());
+            registerButton("breadcrumbButton" + i, () -> selectBreadcrumb(visibleIndex));
+            if (i < MAX_VISIBLE_BREADCRUMBS - 1)
+            {
+                breadcrumbSeparators.add(window.findPaneOfTypeByID("breadcrumbSeparator" + i, Text.class));
+            }
         }
 
         this.requestIcon = window.findPaneOfTypeByID("requestPreview", ItemIcon.class);
@@ -193,7 +215,11 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
             }
         });
         this.craftAmountInput.setMaxTextLength(9);
-        this.craftAmountInput.setHandler(input -> updateCraftButtons());
+        this.craftAmountInput.setHandler(input ->
+        {
+            updateCraftButtons();
+            synchronizeCurrentBreadcrumb();
+        });
         this.craftAmountInput.setText(DEFAULT_CRAFT_AMOUNT);
 
         registerButton("request", this::showRequests);
@@ -329,6 +355,25 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
                 copies.add(stack.copy());
             }
             return copies;
+        }
+    }
+
+    /** A restorable level in the ingredient click-through trail. */
+    private record CraftNavigationEntry(
+        RecipeSelectionSnapshot selection,
+        String craftAmount,
+        ItemStack displayStack,
+        List<ItemStack> selectedGrid)
+    {
+        static CraftNavigationEntry capture(final WindowWorkshopModule window)
+        {
+            final WorkshopRecipe recipe = window.getSelectedRecipe();
+            final ItemStack display = recipe == null ? window.jeiSearchOutput.copy() : recipe.output().copy();
+            return new CraftNavigationEntry(
+                RecipeSelectionSnapshot.capture(window),
+                window.craftAmountInput.getText(),
+                display,
+                RecipeSelectionSnapshot.copyStacks(window.selectedGrid));
         }
     }
 
@@ -524,6 +569,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      */
     private void selectRequest(@NotNull final IRequest<?> request)
     {
+        clearBreadcrumbs();
         clearJeiSelection(true);
         outputLabel.setText(Component.translatable("com.warehouseworkshop.core.gui.workshop.request_item"));
         this.selectedRequest = request;
@@ -544,6 +590,13 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      * @param output the JEI output to select
      */
     public void selectJeiOutput(@NotNull final ItemStack output)
+    {
+        clearBreadcrumbs();
+        selectOutput(output);
+    }
+
+    /** Selects an output without changing breadcrumb ownership. */
+    private void selectOutput(@NotNull final ItemStack output)
     {
         if (output.isEmpty())
         {
@@ -592,6 +645,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         }
 
         updateGridIcons();
+        synchronizeCurrentBreadcrumb();
     }
 
     /**
@@ -606,6 +660,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         selectedRecipeIndex = (selectedRecipeIndex - 1 + matchingRecipes.size()) % matchingRecipes.size();
         applySelectedRecipe();
+        synchronizeCurrentBreadcrumb();
     }
 
     /**
@@ -620,6 +675,7 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
 
         selectedRecipeIndex = (selectedRecipeIndex + 1) % matchingRecipes.size();
         applySelectedRecipe();
+        synchronizeCurrentBreadcrumb();
     }
 
     /**
@@ -880,11 +936,26 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         if (slotStates.get(slot) != SlotState.EMPTY && !displayGrid.get(slot).isEmpty())
         {
             final int clickThroughAmount = getClickThroughCraftAmount(slot);
-            selectJeiOutput(displayGrid.get(slot));
-            if (clickThroughAmount > 0)
+            synchronizeCurrentBreadcrumb();
+            if (breadcrumbTrail.isEmpty())
             {
-                craftAmountInput.setText(Integer.toString(clickThroughAmount));
+                breadcrumbTrail.add(CraftNavigationEntry.capture(this));
             }
+            restoringBreadcrumb = true;
+            try
+            {
+                selectOutput(displayGrid.get(slot));
+                if (clickThroughAmount > 0)
+                {
+                    craftAmountInput.setText(Integer.toString(clickThroughAmount));
+                }
+            }
+            finally
+            {
+                restoringBreadcrumb = false;
+            }
+            breadcrumbTrail.add(CraftNavigationEntry.capture(this));
+            updateBreadcrumbs();
             return;
         }
 
@@ -940,9 +1011,134 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      */
     private void clearGrid()
     {
+        clearBreadcrumbs();
         clearRequestSelection();
         clearJeiSelection(true);
         updateGridIcons();
+    }
+
+    /** Removes the complete click-through navigation trail. */
+    private void clearBreadcrumbs()
+    {
+        breadcrumbTrail.clear();
+        updateBreadcrumbs();
+    }
+
+    /** Keeps the current trail level aligned with edits made in place. */
+    private void synchronizeCurrentBreadcrumb()
+    {
+        if (restoringBreadcrumb || breadcrumbTrail.isEmpty())
+        {
+            return;
+        }
+
+        breadcrumbTrail.set(breadcrumbTrail.size() - 1, CraftNavigationEntry.capture(this));
+        updateBreadcrumbs();
+    }
+
+    /** Restores a visible breadcrumb and discards all descendants. */
+    private void selectBreadcrumb(final int visibleIndex)
+    {
+        final int trailIndex = getVisibleBreadcrumbTrailIndex(visibleIndex);
+        if (trailIndex < 0 || trailIndex >= breadcrumbTrail.size() || trailIndex == breadcrumbTrail.size() - 1)
+        {
+            return;
+        }
+
+        synchronizeCurrentBreadcrumb();
+        final CraftNavigationEntry entry = breadcrumbTrail.get(trailIndex);
+        breadcrumbTrail.subList(trailIndex + 1, breadcrumbTrail.size()).clear();
+        restoreBreadcrumb(entry);
+    }
+
+    /** Restores selection intent, then recalculates ingredient availability from current stock. */
+    private void restoreBreadcrumb(final CraftNavigationEntry entry)
+    {
+        restoringBreadcrumb = true;
+        try
+        {
+            final RecipeSelectionSnapshot selection = entry.selection();
+            selectedRequest = selection.selectedRequest();
+            requestOutputs.clear();
+            requestOutputs.addAll(RecipeSelectionSnapshot.copyStacks(selection.requestOutputs()));
+            jeiSearchOutput = selection.jeiSearchOutput().copy();
+            matchingRecipes.clear();
+            matchingRecipes.addAll(selection.matchingRecipes());
+            selectedRecipeIndex = selection.selectedRecipeIndex();
+            craftAmountInput.setText(entry.craftAmount());
+            applySelectedRecipe();
+            restoreSavedGridChoices(entry.selectedGrid());
+            updateGridIcons();
+        }
+        finally
+        {
+            restoringBreadcrumb = false;
+        }
+        breadcrumbTrail.set(breadcrumbTrail.size() - 1, CraftNavigationEntry.capture(this));
+        updateBreadcrumbs();
+    }
+
+    /** Reuses saved concrete ingredient choices when they still satisfy the restored crafting recipe. */
+    private void restoreSavedGridChoices(final List<ItemStack> savedGrid)
+    {
+        final WorkshopRecipe recipe = getSelectedRecipe();
+        if (recipe == null || recipe.kind() != RecipeKind.CRAFTING || recipe.craftingRecipe() == null)
+        {
+            return;
+        }
+
+        final List<CraftingSlotRequirement> requirements =
+            OptionalRecipeSupport.buildCraftingSlotRequirements(recipe.craftingRecipe().value(), GRID_SIZE);
+        for (int slot = 0; slot < Math.min(GRID_SIZE, savedGrid.size()); slot++)
+        {
+            final ItemStack saved = savedGrid.get(slot);
+            if (!saved.isEmpty() && requirements.get(slot).ingredient().test(saved))
+            {
+                selectedGrid.set(slot, saved.copy());
+                displayGrid.set(slot, saved.copy());
+            }
+        }
+        refreshGridSlotAvailability();
+    }
+
+    /** Updates the fixed breadcrumb strip with the visible tail of the trail. */
+    private void updateBreadcrumbs()
+    {
+        final int visibleCount = Math.min(breadcrumbTrail.size(), MAX_VISIBLE_BREADCRUMBS);
+        for (int i = 0; i < MAX_VISIBLE_BREADCRUMBS; i++)
+        {
+            final boolean visible = i < visibleCount;
+            final ItemIcon icon = breadcrumbIcons.get(i);
+            final Button button = breadcrumbButtons.get(i);
+            icon.setVisible(visible);
+            button.setVisible(visible);
+            button.setEnabled(visible);
+            if (visible)
+            {
+                final CraftNavigationEntry entry = breadcrumbTrail.get(getVisibleBreadcrumbTrailIndex(i));
+                icon.setItem(entry.displayStack());
+                breadcrumbTooltips.get(i).setText(entry.displayStack().getHoverName());
+            }
+            else
+            {
+                icon.setItem(ItemStack.EMPTY);
+            }
+
+            if (i < breadcrumbSeparators.size())
+            {
+                breadcrumbSeparators.get(i).setVisible(i + 1 < visibleCount);
+            }
+        }
+    }
+
+    /** Keeps the root visible while using the remaining slots for the newest levels. */
+    private int getVisibleBreadcrumbTrailIndex(final int visibleIndex)
+    {
+        if (breadcrumbTrail.size() <= MAX_VISIBLE_BREADCRUMBS)
+        {
+            return visibleIndex;
+        }
+        return visibleIndex == 0 ? 0 : breadcrumbTrail.size() - MAX_VISIBLE_BREADCRUMBS + visibleIndex;
     }
 
     /**
