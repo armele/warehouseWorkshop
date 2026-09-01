@@ -22,6 +22,9 @@ public class BuildingsInitializer
         final DeferredHolder<BuildingEntry,BuildingEntry> warehouse = com.minecolonies.api.colony.buildings.ModBuildings.wareHouse;
 
         injectModuleToBuilding(BuildingModules.WORKSHOP_MODULE, warehouse, 2);
+
+        final DeferredHolder<BuildingEntry, BuildingEntry> university = com.minecolonies.api.colony.buildings.ModBuildings.university;
+        injectModuleToBuilding(BuildingModules.RESEARCH_SUPPLIES_MODULE, university, 2);
     }
 
     /**

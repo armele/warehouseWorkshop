@@ -16,6 +16,10 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.DeferredItem;
+import com.deathfrog.warehouseworkshop.core.items.ItemResearchLedger;
+import com.minecolonies.api.creativetab.ModCreativeTabs;
+import com.deathfrog.warehouseworkshop.core.research.ResearchSuppliesConstants;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
 @Mod(WarehouseWorkshopMod.MODID)
@@ -28,6 +32,8 @@ public class WarehouseWorkshopMod {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
     // Create a Deferred Register to hold Items which will all be registered under the "warehouseworkshop" namespace
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
+    /** Portable research-supply viewer and university binding item. */
+    public static final DeferredItem<ItemResearchLedger> RESEARCH_LEDGER = ITEMS.register(ResearchSuppliesConstants.LEDGER_ITEM_ID, ItemResearchLedger::new);
 
 
     // The constructor for the mod class is the first code that is run when your mod is loaded.
@@ -63,8 +69,12 @@ public class WarehouseWorkshopMod {
     }
 
     // Add the example block item to the building blocks tab
+    @SuppressWarnings("null")
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
-
+        if (event.getTabKey().equals(ModCreativeTabs.GENERAL.getKey()))
+        {
+            event.accept(RESEARCH_LEDGER);
+        }
     }
 
     // You can use SubscribeEvent and let the Event Bus discover methods to call

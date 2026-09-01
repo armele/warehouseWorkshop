@@ -80,8 +80,33 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
     private static final int GRID_HEIGHT = 3;
     private static final int DOMUM_FIRST_SLOT = 1;
     private static final int DOMUM_SECOND_SLOT = 4;
-    private static final int STATUS_TEXT_COLOR = Color.getByName("black", 0x000000);
-    private static final int STATUS_MISMATCH_TEXT_COLOR = Color.getByName("red", 0xFF0000);
+    private static final String WINDOW_LAYOUT = "gui/layouthuts/layoutworkshopmodule.xml";
+    private static final String COLOR_BLACK = "black";
+    private static final String COLOR_RED = "red";
+    private static final String GRID_BACKGROUND_ID_PREFIX = "gridBackground";
+    private static final String GRID_ICON_ID_PREFIX = "gridIcon";
+    private static final String GRID_STATUS_ICON_ID_PREFIX = "gridStatusIcon";
+    private static final String GRID_BUTTON_ID_PREFIX = "gridButton";
+    private static final String BREADCRUMB_ICON_ID_PREFIX = "breadcrumbIcon";
+    private static final String BREADCRUMB_BUTTON_ID_PREFIX = "breadcrumbButton";
+    private static final String BREADCRUMB_SEPARATOR_ID_PREFIX = "breadcrumbSeparator";
+    private static final String REQUEST_PREVIEW_ID = "requestPreview";
+    private static final String OUTPUT_PREVIEW_ID = "outputPreview";
+    private static final String REQUEST_LABEL_ID = "requestLabel";
+    private static final String RECIPE_LABEL_ID = "recipeLabel";
+    private static final String OUTPUT_LABEL_ID = "outputLabel";
+    private static final String STATUS_LABEL_ID = "statusLabel";
+    private static final String REQUEST_BUTTON_ID = "request";
+    private static final String CLEAR_BUTTON_ID = "clear";
+    private static final String CRAFT_BUTTON_ID = "craft";
+    private static final String CRAFT_ALL_BUTTON_ID = "craftAll";
+    private static final String PREVIOUS_RECIPE_BUTTON_ID = "prevRecipe";
+    private static final String NEXT_RECIPE_BUTTON_ID = "nextRecipe";
+    private static final String OUTPUT_TARGET_BUTTON_ID = "outputTarget";
+    private static final String INCLUDE_PLAYER_INVENTORY_BUTTON_ID = "includePlayerInventory";
+    private static final String CRAFT_AMOUNT_INPUT_ID = "craftAmount";
+    private static final int STATUS_TEXT_COLOR = Color.getByName(COLOR_BLACK, 0x000000);
+    private static final int STATUS_MISMATCH_TEXT_COLOR = Color.getByName(COLOR_RED, 0xFF0000);
     private static final int SLOT_BACKGROUND_ALPHA = 96;
     private static final int PRESENT_SLOT_RED = 48;
     private static final int PRESENT_SLOT_GREEN = 160;
@@ -146,48 +171,48 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
      */
     public WindowWorkshopModule(final WorkshopModuleView moduleView)
     {
-        super(moduleView, ResourceLocation.fromNamespaceAndPath(WarehouseWorkshopMod.MODID, "gui/layouthuts/layoutworkshopmodule.xml"));
+        super(moduleView, ResourceLocation.fromNamespaceAndPath(WarehouseWorkshopMod.MODID, WINDOW_LAYOUT));
 
         for (int i = 0; i < GRID_SIZE; i++)
         {
             slotMatches.add(new ArrayList<>());
             final int slot = i;
-            gridBackgrounds.add(window.findPaneOfTypeByID("gridBackground" + i, Gradient.class));
-            gridIcons.add(window.findPaneOfTypeByID("gridIcon" + i, ItemIcon.class));
-            final Text gridStatusIcon = window.findPaneOfTypeByID("gridStatusIcon" + i, Text.class);
+            gridBackgrounds.add(window.findPaneOfTypeByID(GRID_BACKGROUND_ID_PREFIX + i, Gradient.class));
+            gridIcons.add(window.findPaneOfTypeByID(GRID_ICON_ID_PREFIX + i, ItemIcon.class));
+            final Text gridStatusIcon = window.findPaneOfTypeByID(GRID_STATUS_ICON_ID_PREFIX + i, Text.class);
             gridStatusIcons.add(gridStatusIcon);
-            final Button gridButton = window.findPaneOfTypeByID("gridButton" + i, Button.class);
+            final Button gridButton = window.findPaneOfTypeByID(GRID_BUTTON_ID_PREFIX + i, Button.class);
             gridButtons.add(gridButton);
             gridStatusTooltips.add(PaneBuilders.tooltipBuilder().hoverPane(gridStatusIcon).build());
-            registerButton("gridButton" + i, () -> setActiveSlot(slot));
+            registerButton(GRID_BUTTON_ID_PREFIX + i, () -> setActiveSlot(slot));
         }
 
         for (int i = 0; i < MAX_VISIBLE_BREADCRUMBS; i++)
         {
             final int visibleIndex = i;
-            final ItemIcon icon = window.findPaneOfTypeByID("breadcrumbIcon" + i, ItemIcon.class);
-            final Button button = window.findPaneOfTypeByID("breadcrumbButton" + i, Button.class);
+            final ItemIcon icon = window.findPaneOfTypeByID(BREADCRUMB_ICON_ID_PREFIX + i, ItemIcon.class);
+            final Button button = window.findPaneOfTypeByID(BREADCRUMB_BUTTON_ID_PREFIX + i, Button.class);
             breadcrumbIcons.add(icon);
             breadcrumbButtons.add(button);
             breadcrumbTooltips.add(PaneBuilders.tooltipBuilder().hoverPane(button).build());
-            registerButton("breadcrumbButton" + i, () -> selectBreadcrumb(visibleIndex));
+            registerButton(BREADCRUMB_BUTTON_ID_PREFIX + i, () -> selectBreadcrumb(visibleIndex));
             if (i < MAX_VISIBLE_BREADCRUMBS - 1)
             {
-                breadcrumbSeparators.add(window.findPaneOfTypeByID("breadcrumbSeparator" + i, Text.class));
+                breadcrumbSeparators.add(window.findPaneOfTypeByID(BREADCRUMB_SEPARATOR_ID_PREFIX + i, Text.class));
             }
         }
 
-        this.requestIcon = window.findPaneOfTypeByID("requestPreview", ItemIcon.class);
-        this.outputIcon = window.findPaneOfTypeByID("outputPreview", ItemIcon.class);
-        this.requestLabel = window.findPaneOfTypeByID("requestLabel", Text.class);
-        this.recipeLabel = window.findPaneOfTypeByID("recipeLabel", Text.class);
-        this.outputLabel = window.findPaneOfTypeByID("outputLabel", Text.class);
-        this.statusLabel = window.findPaneOfTypeByID("statusLabel", Text.class);
-        this.craftButton = window.findPaneOfTypeByID("craft", Button.class);
-        this.craftAllButton = window.findPaneOfTypeByID("craftAll", Button.class);
-        this.outputTargetButton = window.findPaneOfTypeByID("outputTarget", Button.class);
-        this.includePlayerInventoryButton = window.findPaneOfTypeByID("includePlayerInventory", Button.class);
-        this.craftAmountInput = window.findPaneOfTypeByID("craftAmount", TextField.class);
+        this.requestIcon = window.findPaneOfTypeByID(REQUEST_PREVIEW_ID, ItemIcon.class);
+        this.outputIcon = window.findPaneOfTypeByID(OUTPUT_PREVIEW_ID, ItemIcon.class);
+        this.requestLabel = window.findPaneOfTypeByID(REQUEST_LABEL_ID, Text.class);
+        this.recipeLabel = window.findPaneOfTypeByID(RECIPE_LABEL_ID, Text.class);
+        this.outputLabel = window.findPaneOfTypeByID(OUTPUT_LABEL_ID, Text.class);
+        this.statusLabel = window.findPaneOfTypeByID(STATUS_LABEL_ID, Text.class);
+        this.craftButton = window.findPaneOfTypeByID(CRAFT_BUTTON_ID, Button.class);
+        this.craftAllButton = window.findPaneOfTypeByID(CRAFT_ALL_BUTTON_ID, Button.class);
+        this.outputTargetButton = window.findPaneOfTypeByID(OUTPUT_TARGET_BUTTON_ID, Button.class);
+        this.includePlayerInventoryButton = window.findPaneOfTypeByID(INCLUDE_PLAYER_INVENTORY_BUTTON_ID, Button.class);
+        this.craftAmountInput = window.findPaneOfTypeByID(CRAFT_AMOUNT_INPUT_ID, TextField.class);
         this.craftAmountInput.setFilter(new TextField.Filter()
         {
             /**
@@ -222,16 +247,16 @@ public class WindowWorkshopModule extends AbstractModuleWindow<WorkshopModuleVie
         });
         this.craftAmountInput.setText(DEFAULT_CRAFT_AMOUNT);
 
-        registerButton("request", this::showRequests);
-        registerButton("clear", this::clearGrid);
-        registerButton("craft", this::craft);
-        registerButton("craftAll", this::craftAll);
-        registerButton("prevRecipe", this::selectPreviousRecipe);
-        registerButton("nextRecipe", this::selectNextRecipe);
-        registerButton("outputTarget", this::toggleOutputTarget);
-        registerButton("includePlayerInventory", this::toggleIncludePlayerInventory);
+        registerButton(REQUEST_BUTTON_ID, this::showRequests);
+        registerButton(CLEAR_BUTTON_ID, this::clearGrid);
+        registerButton(CRAFT_BUTTON_ID, this::craft);
+        registerButton(CRAFT_ALL_BUTTON_ID, this::craftAll);
+        registerButton(PREVIOUS_RECIPE_BUTTON_ID, this::selectPreviousRecipe);
+        registerButton(NEXT_RECIPE_BUTTON_ID, this::selectNextRecipe);
+        registerButton(OUTPUT_TARGET_BUTTON_ID, this::toggleOutputTarget);
+        registerButton(INCLUDE_PLAYER_INVENTORY_BUTTON_ID, this::toggleIncludePlayerInventory);
 
-        Button requestButton = window.findPaneOfTypeByID("request", Button.class);
+        Button requestButton = window.findPaneOfTypeByID(REQUEST_BUTTON_ID, Button.class);
         PaneBuilders.tooltipBuilder()
                 .append(Component.translatable("com.warehouseworkshop.core.gui.workshop.request.tooltip"))
                 .hoverPane(requestButton)

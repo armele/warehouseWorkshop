@@ -26,5 +26,8 @@ public final class NetworkHandler
         registrar.playToServer(RequestWorkshopSettingsMessage.ID, RequestWorkshopSettingsMessage.STREAM_CODEC, RequestWorkshopSettingsMessage::onExecute);
         registrar.playToServer(SetWorkshopOutputTargetMessage.ID, SetWorkshopOutputTargetMessage.STREAM_CODEC, SetWorkshopOutputTargetMessage::onExecute);
         registrar.playToServer(SetWorkshopIncludePlayerInventoryMessage.ID, SetWorkshopIncludePlayerInventoryMessage.STREAM_CODEC, SetWorkshopIncludePlayerInventoryMessage::onExecute);
+        registrar.playToServer(RequestResearchSuppliesMessage.ID, RequestResearchSuppliesMessage.STREAM_CODEC, RequestResearchSuppliesMessage::onExecute);
+        registrar.playToServer(CreateResearchDeliveryMessage.ID, CreateResearchDeliveryMessage.STREAM_CODEC, CreateResearchDeliveryMessage::onExecute);
+        registrar.playToClient(ClientboundResearchSuppliesMessage.ID, ClientboundResearchSuppliesMessage.STREAM_CODEC, ClientboundResearchSuppliesMessage::onExecute);
     }
 }

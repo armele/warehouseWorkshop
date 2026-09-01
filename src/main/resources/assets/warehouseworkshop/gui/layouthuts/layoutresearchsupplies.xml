@@ -1,0 +1,17 @@
+<window xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/ldtteam/BlockUI/version/main/src/main/resources/assets/blockui/gui/block_ui.xsd" size="240 318">
+    <image source="minecolonies:textures/gui/builderhut/builder_paper.png" size="240 318"/>
+    <text id="desc" size="170 11" pos="35 10" textalign="MIDDLE" color="black" label="$(com.warehouseworkshop.research_supplies.title)"/>
+    <image id="help" source="warehouseworkshop:textures/gui/modules/help.png" size="11 11" pos="211 10" visible="true"/>
+    <list id="researches" size="210 269" pos="15 27">
+        <box size="100% 70" linewidth="1">
+            <text id="researchName" size="195 11" pos="4 2" color="black"/>
+            <text id="researchState" size="195 20" pos="4 13" color="darkgray"/>
+            <itemicon id="cost0" size="16 16" pos="4 36"/><text id="state0" size="16 8" pos="4 52" textalign="MIDDLE_RIGHT" color="black"/>
+            <itemicon id="cost1" size="16 16" pos="24 36"/><text id="state1" size="16 8" pos="24 52" textalign="MIDDLE_RIGHT" color="black"/>
+            <itemicon id="cost2" size="16 16" pos="44 36"/><text id="state2" size="16 8" pos="44 52" textalign="MIDDLE_RIGHT" color="black"/>
+            <itemicon id="cost3" size="16 16" pos="64 36"/><text id="state3" size="16 8" pos="64 52" textalign="MIDDLE_RIGHT" color="black"/>
+            <button id="deliver" size="110 16" pos="91 34" color="black" label="$(com.warehouseworkshop.research_supplies.deliver)" source="minecolonies:textures/gui/builderhut/builder_button_small.png"/>
+            <button id="deliverStart" size="110 16" pos="91 51" color="black" label="$(com.warehouseworkshop.research_supplies.deliver_start)" source="minecolonies:textures/gui/builderhut/builder_button_small.png"/>
+        </box>
+    </list>
+</window>

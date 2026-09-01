@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "RRR",
+    "RBR",
+    "RRR"
+  ],
+  "key": {
+    "R": { "item": "minecraft:redstone" },
+    "B": { "item": "minecraft:writable_book" }
+  },
+  "result": {
+    "id": "warehouseworkshop:research_ledger",
+    "count": 1
+  }
+}
